@@ -41,6 +41,7 @@ import { patchTaxonomyV2Schema } from '../jobs/patchTaxonomyV2Schema';
 import { patchPublicationGateSchema } from '../jobs/patchPublicationGateSchema';
 import { patchCanonicalIdentitySchema } from '../jobs/patchCanonicalIdentitySchema';
 import { patchCatalogTaxonomyGovernanceSchema } from '../jobs/patchCatalogTaxonomyGovernanceSchema';
+import { patchBarcodeResolutionSchema } from '../jobs/patchBarcodeResolutionSchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
 import { backfillCanonicalIdentity } from '../jobs/backfillCanonicalIdentity';
@@ -1767,6 +1768,13 @@ adminRoutes.post('/jobs/patch_catalog_taxonomy_governance_schema', async (c) => 
   return c.json(result);
 });
 
+adminRoutes.post('/jobs/patch_barcode_resolution_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchBarcodeResolutionSchema(c.env);
+  return c.json(result);
+});
+
 adminRoutes.post('/jobs/reclassify_canonical_taxonomy_shadow', async (c) => {
   const gate = await requireAdminOrInternal(c);
   if (!gate.ok || !gate.db) return gate.res!;
@@ -1812,6 +1820,35 @@ adminRoutes.get('/catalog_taxonomy/quarantine', async (c) => {
     from public.catalog_taxonomy_quarantine q
     ${where}
     order by q.review_priority asc, q.created_at desc
+    limit ${limit}
+  `).catch(() => ({ rows: [] as any[] }));
+
+  return c.json({ ok: true, items: rows.rows ?? [] });
+});
+
+adminRoutes.get('/barcode_resolution/recent', async (c) => {
+  const gate = await requireAdmin(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const limit = Math.max(1, Math.min(200, Number(c.req.query('limit') ?? 50)));
+
+  const rows = await gate.db.execute(sql`
+    select
+      r.id,
+      r.input_text,
+      r.parsed_code,
+      r.identifier_type,
+      r.parse_source,
+      r.resolution_status,
+      r.variant_id,
+      r.family_id,
+      r.legacy_product_id,
+      r.region_id,
+      r.external_source,
+      r.confidence,
+      r.created_at,
+      r.completed_at
+    from public.barcode_resolution_runs r
+    order by r.created_at desc
     limit ${limit}
   `).catch(() => ({ rows: [] as any[] }));
 

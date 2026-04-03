@@ -4,6 +4,7 @@ import { getDb, type Env } from '../db';
 import type { AppAuthContext } from '../auth/appUser';
 import { inferCategoryKeyDetailed } from '../ingestion/categoryInfer';
 import { buildNameSearchTokens, fetchOpenFoodFactsProduct, inferIdentifierType, normalizeIdentifierValue, normalizeSearchText } from '../catalog/identifierResolver';
+import { parseBarcodeInput, resolveBarcodeLookup } from '../catalog/barcodeResolution';
 
 type Ctx = { Bindings: Env; Variables: { auth: AppAuthContext | null } };
 
@@ -1133,119 +1134,53 @@ viewRoutes.get('/compare_products', async (c) => {
 
 viewRoutes.get('/qr_resolve', async (c) => {
   const text = c.req.query('text') ?? c.req.query('qr') ?? c.req.query('code') ?? '';
-  const parsed = parseCodeFromText(text);
-  return c.json({ ok: !!parsed.code, input: text, ...parsed });
+  const parsed = parseBarcodeInput(text);
+  return c.json({
+    ok: !!parsed.code,
+    input: text,
+    code: parsed.code,
+    source: parsed.source,
+    candidates: parsed.candidates,
+    identifier_type: parsed.identifierType,
+    check_digit_valid: parsed.checkDigitValid,
+    gs1: parsed.gs1,
+  });
 });
 
 viewRoutes.get('/lookup_by_code', async (c) => {
   const raw = c.req.query('code') ?? c.req.query('text');
   const regionId = c.req.query('region_id');
   const limitOffers = clampInt(c.req.query('limit_offers'), 10, 1, 50);
-  const parsed = parseCodeFromText(raw);
-  if (!parsed.code) return c.json({ error: 'code not found in input', ...parsed }, 400);
-
   const db = getDb(c.env);
-  const resolved = await lookupInternalProductByCode(db, parsed.code);
-  if (!resolved.product) {
-    return c.json({
-      ok: false,
-      input: raw ?? null,
-      resolved_code: parsed.code,
-      candidates: parsed.candidates,
-      identifier_type: inferIdentifierType(parsed.code, raw ?? null),
-      product: null,
-      offers: [],
-    });
+  const result = await resolveBarcodeLookup(db, raw ?? null, {
+    regionId,
+    limitOffers,
+    allowExternal: false,
+  });
+
+  if (!result.resolved_code) {
+    return c.json({ error: 'code not found in input', ...result }, 400);
   }
 
-  const offers = await fetchOffersForProduct(db, String((resolved.product as any).id), regionId, limitOffers);
-
-  return c.json({
-    ok: true,
-    input: raw ?? null,
-    resolved_code: parsed.code,
-    candidates: parsed.candidates,
-    identifier_type: resolved.identifierType,
-    resolution: { match_type: resolved.matchType, confidence: resolved.confidence },
-    product: resolved.product,
-    offers,
-  });
+  return c.json(result);
 });
 
 viewRoutes.get('/lookup_by_qr', async (c) => {
   const codeOrText = c.req.query('code') ?? c.req.query('qr') ?? c.req.query('text') ?? '';
   const regionId = c.req.query('region_id');
   const limitOffers = clampInt(c.req.query('limit_offers'), 10, 1, 50);
-  const parsed = parseCodeFromText(codeOrText);
-  if (!parsed.code) return c.json({ error: 'code not found in qr/text', ...parsed }, 400);
-
   const db = getDb(c.env);
-  const resolved = await lookupInternalProductByCode(db, parsed.code);
-  const identifierType = resolved.identifierType ?? inferIdentifierType(parsed.code, codeOrText);
-
-  if (resolved.product) {
-    const offers = await fetchOffersForProduct(db, String((resolved.product as any).id), regionId, limitOffers);
-    return c.json({
-      ok: true,
-      input: codeOrText,
-      resolved_code: parsed.code,
-      candidates: parsed.candidates,
-      identifier_type: identifierType,
-      resolution: { match_type: resolved.matchType, confidence: resolved.confidence },
-      product: resolved.product,
-      offers,
-      external_catalog: null,
-      external_prices: [],
-      cheapest_external: null,
-    });
-  }
-
-  const externalCatalog = await fetchOpenFoodFactsProduct(parsed.code).catch(() => null);
-  if (externalCatalog) {
-    const externalPrices = await searchOffersByExternalCatalog(db, {
-      name: externalCatalog.name,
-      brand: externalCatalog.brand,
-      quantity: externalCatalog.quantity,
-    }, regionId, limitOffers);
-
-    return c.json({
-      ok: true,
-      input: codeOrText,
-      resolved_code: parsed.code,
-      candidates: parsed.candidates,
-      identifier_type: identifierType,
-      resolution: { match_type: 'external', confidence: externalPrices.length ? 0.74 : 0.55 },
-      product: null,
-      offers: [],
-      external_catalog: {
-        source: externalCatalog.source,
-        source_url: externalCatalog.sourceUrl,
-        code: externalCatalog.code,
-        identifier_type: externalCatalog.identifierType,
-        name: externalCatalog.name,
-        brand: externalCatalog.brand,
-        quantity: externalCatalog.quantity,
-        image_url: externalCatalog.imageUrl,
-        categories: externalCatalog.categories,
-      },
-      external_prices: externalPrices,
-      cheapest_external: summariseExternalCheapest(externalPrices),
-    });
-  }
-
-  return c.json({
-    ok: false,
-    input: codeOrText,
-    resolved_code: parsed.code,
-    candidates: parsed.candidates,
-    identifier_type: identifierType,
-    resolution: { match_type: 'none', confidence: 0 },
-    product: null,
-    offers: [],
-    external_catalog: null,
-    external_prices: [],
-    cheapest_external: null,
+  const result = await resolveBarcodeLookup(db, codeOrText, {
+    regionId,
+    limitOffers,
+    allowExternal: true,
   });
+
+  if (!result.resolved_code) {
+    return c.json({ error: 'code not found in qr/text', ...result }, 400);
+  }
+
+  return c.json(result);
 });
 
 viewRoutes.get('/ingestion_health', async (c) => {

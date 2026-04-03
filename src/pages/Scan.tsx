@@ -21,12 +21,15 @@ type LookupResult = {
   input?: string | null;
   resolved_code?: string | null;
   product?: Record<string, any> | null;
+  canonical_variant?: Record<string, any> | null;
   offers?: Record<string, any>[];
   external_catalog?: Record<string, any> | null;
   external_prices?: Record<string, any>[];
   cheapest_external?: Record<string, any> | null;
+  catalog_matches?: Record<string, any>[];
   resolution?: { match_type?: string; confidence?: number } | null;
   identifier_type?: string | null;
+  check_digit_valid?: boolean | null;
   error?: string;
   candidates?: string[];
 };
@@ -77,6 +80,8 @@ export default function ScanPage() {
   const externalCatalog = lookupResult?.external_catalog ?? null;
   const externalPrices = lookupResult?.external_prices ?? [];
   const cheapestExternal = lookupResult?.cheapest_external ?? null;
+  const canonicalVariant = lookupResult?.canonical_variant ?? null;
+  const catalogMatches = lookupResult?.catalog_matches ?? [];
   const product = lookupResult?.product ?? null;
   const productId = product?.id ? String(product.id) : '';
 
@@ -427,6 +432,48 @@ export default function ScanPage() {
                         <span> · ثقة: {Math.round(Number(lookupResult.resolution.confidence) * 100)}%</span>
                       ) : null}
                       {lookupResult.identifier_type ? <span> · المعرّف: {String(lookupResult.identifier_type)}</span> : null}
+                      {typeof lookupResult.check_digit_valid === 'boolean' ? (
+                        <span> · GTIN: {lookupResult.check_digit_valid ? 'valid' : 'invalid'}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {!product && (canonicalVariant || catalogMatches.length > 0) ? (
+                    <div className="rounded-lg border p-3 space-y-3">
+                      <div className="text-sm font-medium">مطابقات داخلية محتملة</div>
+                      {canonicalVariant ? (
+                        <div className="rounded-md border p-2 text-sm">
+                          <div className="font-semibold">
+                            {String(canonicalVariant.display_name_ar ?? canonicalVariant.display_name_en ?? canonicalVariant.family_name_ar ?? 'canonical variant')}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-3">
+                            {canonicalVariant.taxonomy_key ? <span>Taxonomy: {String(canonicalVariant.taxonomy_key)}</span> : null}
+                            {canonicalVariant.barcode_primary ? <span>Barcode: {String(canonicalVariant.barcode_primary)}</span> : null}
+                            {canonicalVariant.legacy_product_id ? <span>Legacy product: {String(canonicalVariant.legacy_product_id)}</span> : null}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {catalogMatches.length > 0 ? (
+                        <div className="space-y-2">
+                          {catalogMatches.slice(0, 3).map((match, idx) => (
+                            <div key={String((match as any).variant_id ?? idx)} className="rounded-md border p-2 text-sm">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="font-medium">
+                                  {String((match as any).display_name_ar ?? (match as any).display_name_en ?? (match as any).family_name_ar ?? 'match')}
+                                </div>
+                                {typeof (match as any).match_confidence === 'number' ? (
+                                  <Badge variant="outline">{Math.round(Number((match as any).match_confidence) * 100)}%</Badge>
+                                ) : null}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-3">
+                                {(match as any).taxonomy_key ? <span>{String((match as any).taxonomy_key)}</span> : null}
+                                {(match as any).legacy_product_id ? <span>Legacy: {String((match as any).legacy_product_id)}</span> : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
