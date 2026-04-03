@@ -36,3 +36,4 @@ performance-results-*.json
 *.njsproj
 *.sln
 *.sw?
+*.bak
