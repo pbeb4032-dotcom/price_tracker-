@@ -74,4 +74,24 @@ describe('publication gate', () => {
     expect(result.publishable).toBe(false);
     expect(result.reasons).toContain('taxonomy_confidence_low');
   });
+
+  it('quarantines canonical matches that still lack a legacy projection', () => {
+    const result = assessPublicationGate({
+      match: {
+        sourceId: 'source-1',
+        productId: null,
+        variantId: 'variant-1',
+        familyId: 'family-1',
+        matchKind: 'canonical_fingerprint',
+        confidence: 0.93,
+      },
+      taxonomyConfidence: 0.96,
+      priceConfidence: 0.88,
+      categoryConflict: false,
+      taxonomyConflict: false,
+    });
+
+    expect(result.publishable).toBe(false);
+    expect(result.reasons).toContain('legacy_projection_missing');
+  });
 });

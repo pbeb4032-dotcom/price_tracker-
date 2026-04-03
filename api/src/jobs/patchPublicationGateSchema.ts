@@ -58,8 +58,10 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
       subcategory_hint text,
       taxonomy_hint text,
       match_kind text not null default 'none'
-        check (match_kind in ('url_map', 'identifier', 'exact_name', 'none')),
+        check (match_kind in ('url_map', 'identifier', 'canonical_identifier', 'canonical_fingerprint', 'legacy_product', 'exact_name', 'none')),
       matched_product_id uuid null references public.products(id) on delete set null,
+      matched_variant_id uuid null references public.catalog_product_variants(id) on delete set null,
+      matched_family_id uuid null references public.catalog_product_families(id) on delete set null,
       identity_confidence numeric(4,3) not null default 0,
       taxonomy_confidence numeric(4,3) not null default 0,
       price_confidence numeric(4,3) not null default 0,
@@ -76,9 +78,18 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
       unique(document_id)
     )
   `);
+  await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists matched_variant_id uuid null references public.catalog_product_variants(id) on delete set null`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists matched_family_id uuid null references public.catalog_product_families(id) on delete set null`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates drop constraint if exists ingest_listing_candidates_match_kind_check`).catch(() => {});
+  await db.execute(sql`
+    alter table public.ingest_listing_candidates
+    add constraint ingest_listing_candidates_match_kind_check
+    check (match_kind in ('url_map', 'identifier', 'canonical_identifier', 'canonical_fingerprint', 'legacy_product', 'exact_name', 'none'))
+  `).catch(() => {});
   await db.execute(sql`create index if not exists idx_ingest_listing_candidates_status on public.ingest_listing_candidates(publish_status, created_at desc)`).catch(() => {});
   await db.execute(sql`create index if not exists idx_ingest_listing_candidates_source on public.ingest_listing_candidates(source_domain, created_at desc)`).catch(() => {});
   await db.execute(sql`create index if not exists idx_ingest_listing_candidates_match on public.ingest_listing_candidates(match_kind, identity_confidence desc)`).catch(() => {});
+  await db.execute(sql`create index if not exists idx_ingest_listing_candidates_variant on public.ingest_listing_candidates(matched_variant_id, created_at desc)`).catch(() => {});
 
   await db.execute(sql`
     create table if not exists public.ingest_decisions (
@@ -105,6 +116,8 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
       target_kind text not null default 'legacy_product_projection'
         check (target_kind in ('legacy_product_projection', 'catalog_variant_projection')),
       legacy_product_id uuid null references public.products(id) on delete set null,
+      target_variant_id uuid null references public.catalog_product_variants(id) on delete set null,
+      target_family_id uuid null references public.catalog_product_families(id) on delete set null,
       status text not null default 'pending'
         check (status in ('pending', 'processing', 'published', 'skipped', 'failed')),
       attempts integer not null default 0,
@@ -116,6 +129,8 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
       unique(candidate_id)
     )
   `);
+  await db.execute(sql`alter table public.catalog_publish_queue add column if not exists target_variant_id uuid null references public.catalog_product_variants(id) on delete set null`).catch(() => {});
+  await db.execute(sql`alter table public.catalog_publish_queue add column if not exists target_family_id uuid null references public.catalog_product_families(id) on delete set null`).catch(() => {});
   await db.execute(sql`create index if not exists idx_catalog_publish_queue_status on public.catalog_publish_queue(status, scheduled_at asc)`).catch(() => {});
 
   return { ok: true };

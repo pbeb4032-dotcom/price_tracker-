@@ -14,6 +14,7 @@ import { patchCategoryGroceriesKey } from './jobs/patchCategoryGroceriesKey';
 import { patchTaxonomyOverridesSchema } from './jobs/patchTaxonomyOverridesSchema';
 import { patchTaxonomyV2Schema } from './jobs/patchTaxonomyV2Schema';
 import { patchPublicationGateSchema } from './jobs/patchPublicationGateSchema';
+import { patchCanonicalIdentitySchema } from './jobs/patchCanonicalIdentitySchema';
 import { seedTaxonomyV2 } from './jobs/seedTaxonomyV2';
 import { validateCandidateSources } from './jobs/validateCandidateSources';
 import { activateCandidateSources } from './jobs/activateCandidateSources';
@@ -112,6 +113,16 @@ async function main() {
     logger.info('Publication gate schema patched successfully');
   } catch (e: any) {
     logger.warn('patchPublicationGateSchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
+  }
+
+  try {
+    await patchCanonicalIdentitySchema(env as any);
+    logger.info('Canonical identity schema patched successfully');
+  } catch (e: any) {
+    logger.warn('patchCanonicalIdentitySchema failed', {
       error: e?.message ?? e,
       stack: e?.stack,
     });
@@ -507,6 +518,10 @@ await db.execute(sql`
     await patchPublicationGateSchema(env as any);
   });
 
+  void safeRun('patch_canonical_identity_schema', async () => {
+    await patchCanonicalIdentitySchema(env as any);
+  });
+
   void safeRun('seed_taxonomy_v2', async () => {
     await seedTaxonomyV2(env as any);
   });
@@ -612,6 +627,10 @@ await db.execute(sql`
 
   void safeRun('patch_publication_gate_schema', async () => {
     await patchPublicationGateSchema(env as any);
+  });
+
+  void safeRun('patch_canonical_identity_schema', async () => {
+    await patchCanonicalIdentitySchema(env as any);
   });
 
   void safeRun('seed_taxonomy_v2', async () => {

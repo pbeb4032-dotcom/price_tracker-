@@ -1,11 +1,21 @@
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
+import { resolveCanonicalVariant } from '../catalog/canonicalIdentity';
 
-export type LegacyCatalogMatchKind = 'url_map' | 'identifier' | 'exact_name' | 'none';
+export type LegacyCatalogMatchKind =
+  | 'url_map'
+  | 'identifier'
+  | 'canonical_identifier'
+  | 'canonical_fingerprint'
+  | 'legacy_product'
+  | 'exact_name'
+  | 'none';
 
 export type LegacyCatalogMatch = {
   sourceId: string | null;
   productId: string | null;
+  variantId?: string | null;
+  familyId?: string | null;
   matchKind: LegacyCatalogMatchKind;
   confidence: number;
 };
@@ -69,6 +79,28 @@ export function isPublicationGateEnabled(): boolean {
   return ENABLE_PUBLICATION_GATE;
 }
 
+async function attachCanonicalContext(
+  db: any,
+  base: LegacyCatalogMatch,
+  legacyProductId?: string | null,
+): Promise<LegacyCatalogMatch> {
+  const targetProductId = legacyProductId ?? base.productId;
+  if (!targetProductId) return base;
+
+  const canonical = await resolveCanonicalVariant(db, {
+    legacyProductId: targetProductId,
+  }).catch(() => null);
+
+  if (!canonical?.variantId) return base;
+
+  return {
+    ...base,
+    productId: base.productId ?? canonical.legacyProductId,
+    variantId: canonical.variantId,
+    familyId: canonical.familyId,
+  };
+}
+
 export async function resolveLegacyCatalogMatch(
   db: any,
   input: {
@@ -100,8 +132,31 @@ export async function resolveLegacyCatalogMatch(
     `).catch(() => ({ rows: [] as any[] }));
     const mappedId = ((mapped.rows as any[])[0]?.product_id as string | undefined) ?? null;
     if (mappedId) {
-      return { sourceId, productId: mappedId, matchKind: 'url_map', confidence: 0.99 };
+      return attachCanonicalContext(db, {
+        sourceId,
+        productId: mappedId,
+        variantId: null,
+        familyId: null,
+        matchKind: 'url_map',
+        confidence: 0.99,
+      });
     }
+  }
+
+  const canonical = await resolveCanonicalVariant(db, {
+    nameAr: input.name,
+    nameEn: input.name,
+    barcode: input.barcode,
+  }).catch(() => null);
+  if (canonical?.variantId) {
+    return {
+      sourceId,
+      productId: canonical.legacyProductId,
+      variantId: canonical.variantId,
+      familyId: canonical.familyId,
+      matchKind: canonical.matchKind === 'identifier' ? 'canonical_identifier' : canonical.matchKind === 'fingerprint' ? 'canonical_fingerprint' : 'legacy_product',
+      confidence: canonical.confidence,
+    };
   }
 
   const barcode = normalizeIdentifier(input.barcode);
@@ -116,7 +171,14 @@ export async function resolveLegacyCatalogMatch(
     `).catch(() => ({ rows: [] as any[] }));
     const identifierId = ((byIdentifier.rows as any[])[0]?.id as string | undefined) ?? null;
     if (identifierId) {
-      return { sourceId, productId: identifierId, matchKind: 'identifier', confidence: 0.995 };
+      return attachCanonicalContext(db, {
+        sourceId,
+        productId: identifierId,
+        variantId: null,
+        familyId: null,
+        matchKind: 'identifier',
+        confidence: 0.995,
+      });
     }
 
     const byBarcode = await db.execute(sql`
@@ -128,7 +190,14 @@ export async function resolveLegacyCatalogMatch(
     `).catch(() => ({ rows: [] as any[] }));
     const barcodeId = ((byBarcode.rows as any[])[0]?.id as string | undefined) ?? null;
     if (barcodeId) {
-      return { sourceId, productId: barcodeId, matchKind: 'identifier', confidence: 0.985 };
+      return attachCanonicalContext(db, {
+        sourceId,
+        productId: barcodeId,
+        variantId: null,
+        familyId: null,
+        matchKind: 'identifier',
+        confidence: 0.985,
+      });
     }
   }
 
@@ -144,11 +213,18 @@ export async function resolveLegacyCatalogMatch(
     `).catch(() => ({ rows: [] as any[] }));
     const exactNameId = ((byName.rows as any[])[0]?.id as string | undefined) ?? null;
     if (exactNameId) {
-      return { sourceId, productId: exactNameId, matchKind: 'exact_name', confidence: 0.62 };
+      return attachCanonicalContext(db, {
+        sourceId,
+        productId: exactNameId,
+        variantId: null,
+        familyId: null,
+        matchKind: 'exact_name',
+        confidence: 0.62,
+      });
     }
   }
 
-  return { sourceId, productId: null, matchKind: 'none', confidence: 0 };
+  return { sourceId, productId: null, variantId: null, familyId: null, matchKind: 'none', confidence: 0 };
 }
 
 export function assessPublicationGate(input: {
@@ -175,7 +251,8 @@ export function assessPublicationGate(input: {
   }
 
   const reasons: string[] = [];
-  if (input.match.matchKind === 'none') reasons.push('identity_unresolved');
+  if (input.match.matchKind === 'none' && !input.match.variantId) reasons.push('identity_unresolved');
+  if (input.match.variantId && !input.match.productId) reasons.push('legacy_projection_missing');
   if (input.match.matchKind === 'exact_name' && !ALLOW_EXACT_NAME_PUBLISH) reasons.push('exact_name_match_not_publishable');
   if (input.categoryConflict) reasons.push('category_conflict');
   if (input.taxonomyConflict) reasons.push('taxonomy_conflict');
@@ -279,6 +356,8 @@ export async function recordPublicationGateArtifacts(
       taxonomy_hint,
       match_kind,
       matched_product_id,
+      matched_variant_id,
+      matched_family_id,
       identity_confidence,
       taxonomy_confidence,
       price_confidence,
@@ -304,6 +383,8 @@ export async function recordPublicationGateArtifacts(
       ${input.taxonomyHint ?? null},
       ${input.match.matchKind},
       ${input.match.productId}::uuid,
+      ${input.match.variantId ?? null}::uuid,
+      ${input.match.familyId ?? null}::uuid,
       ${input.decision.identityConfidence},
       ${input.decision.taxonomyConfidence},
       ${input.decision.priceConfidence},
@@ -325,7 +406,12 @@ export async function recordPublicationGateArtifacts(
       status: input.match.matchKind === 'url_map' || input.match.matchKind === 'identifier' ? 'approved' : 'quarantined',
       confidence: input.decision.identityConfidence,
       reason: input.match.matchKind === 'none' ? 'identity_unresolved' : input.match.matchKind,
-      evidence: { match_kind: input.match.matchKind, matched_product_id: input.match.productId },
+      evidence: {
+        match_kind: input.match.matchKind,
+        matched_product_id: input.match.productId,
+        matched_variant_id: input.match.variantId,
+        matched_family_id: input.match.familyId,
+      },
     },
     {
       type: 'taxonomy',
@@ -378,6 +464,8 @@ export async function recordPublicationGateArtifacts(
         candidate_id,
         target_kind,
         legacy_product_id,
+        target_variant_id,
+        target_family_id,
         status,
         attempts,
         scheduled_at
@@ -385,12 +473,16 @@ export async function recordPublicationGateArtifacts(
         ${candidateId}::uuid,
         'legacy_product_projection',
         ${input.match.productId}::uuid,
+        ${input.match.variantId ?? null}::uuid,
+        ${input.match.familyId ?? null}::uuid,
         'pending',
         0,
         now()
       )
       on conflict (candidate_id) do update set
         legacy_product_id = excluded.legacy_product_id,
+        target_variant_id = excluded.target_variant_id,
+        target_family_id = excluded.target_family_id,
         status = 'pending',
         updated_at = now()
     `);

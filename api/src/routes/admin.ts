@@ -39,8 +39,10 @@ import { applyCategoryOverrides } from '../jobs/applyCategoryOverrides';
 import { extractProductFromHtml } from '../ingestion/productExtract';
 import { patchTaxonomyV2Schema } from '../jobs/patchTaxonomyV2Schema';
 import { patchPublicationGateSchema } from '../jobs/patchPublicationGateSchema';
+import { patchCanonicalIdentitySchema } from '../jobs/patchCanonicalIdentitySchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
+import { backfillCanonicalIdentity } from '../jobs/backfillCanonicalIdentity';
 import { normalizeSiteCategory, taxonomyKeyToCategoryAndSubcategory } from '../ingestion/taxonomyV2';
 import { patchAppSettingsSchemaJob } from '../jobs/patchAppSettingsSchema';
 import { autoDiscoveryDaily } from '../jobs/autoDiscoveryDaily';
@@ -1735,6 +1737,24 @@ adminRoutes.post('/jobs/patch_publication_gate_schema', async (c) => {
   const gate = await requireAdminOrInternal(c);
   if (!gate.ok || !gate.db) return gate.res!;
   const result = await patchPublicationGateSchema(c.env);
+  return c.json(result);
+});
+
+adminRoutes.post('/jobs/patch_canonical_identity_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchCanonicalIdentitySchema(c.env);
+  return c.json(result);
+});
+
+adminRoutes.post('/jobs/backfill_canonical_identity', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const body = await c.req.json().catch(() => ({}));
+  const result = await backfillCanonicalIdentity(c.env, {
+    limit: (body as any).limit,
+    offset: (body as any).offset,
+  });
   return c.json(result);
 });
 
