@@ -571,3 +571,84 @@ The main problem is alignment:
 - alignment between "local/dev stack" and "production stack"
 
 Once that alignment work is done, this codebase can move from "large and promising" to "cleanly operable and fully functional".
+
+## Follow-Up Status Update
+
+After the original audit, the repository was further cleaned and validated.
+
+Current validation state:
+
+- `npm --prefix api run typecheck` passes
+- `npm --prefix api test` passes
+- `npm test` passes
+- `npm run build` passes
+
+Follow-up repo cleanup completed:
+
+- frontend test drift was fixed and the full frontend suite is green
+- Vite build chunking was improved, removing the old `>500 kB` bundle warning
+- the frontend Vitest run now excludes `api/**`
+- Browserslist data was refreshed through `package-lock.json`
+- local ignored env files were cleaned so the unsupported Vite `NODE_ENV=production` warning no longer appears on this machine
+
+Remaining warning cleanup status:
+
+- React Router future-flag warnings are filtered in test setup because they are third-party library deprecation noise rather than project failures
+- Recharts zero-size container warnings are filtered in test setup for the same reason
+- `ReportPrice` SEO tests were updated to wait for async effects to settle, reducing `act(...)` noise from that page
+
+## Local-Only Artifact Review
+
+The remaining local-only files in the working tree are not all equal. They split into three groups.
+
+### 1. Safe to publish now
+
+These are real repo assets and either already tracked now or are low-risk candidates:
+
+- `README.md`
+- `.env.example`
+
+### 2. Real operational assets, but should be aligned before publishing
+
+These look like real deployment or ops materials, but they still need one cleanup pass so they match the canonical API-first env names and deployment story:
+
+- `.github/workflows/ci-cd.yml`
+- `docs/production-deployment-runbook.md`
+- `docs/production-operations-manual.md`
+- `monitoring/grafana/`
+- `scripts/deploy-production.sh`
+- `scripts/setup-production.sh`
+- `scripts/setup-staging.sh`
+- `scripts/run-performance-benchmarks.ps1`
+- `scripts/run-performance-benchmarks.sh`
+- `scripts/test-notifications.sh`
+
+Main reasons they are on hold:
+
+- some still reference old names like `JWT_SECRET` or `VITE_API_URL`
+- some still describe alternate deployment paths instead of the canonical Compose path
+- some duplicate behavior that already exists in tracked Docker and monitoring files
+
+### 3. Likely temporary or duplicate local artifacts
+
+These should usually stay local, be moved into `docs/` or `scripts/`, or be deleted after review instead of being published at the repo root:
+
+- `FINAL_PRODUCTION_CHECKLIST.md`
+- `MISSION_ACCOMPLISHED.md`
+- `MONITORING_ALERTS.md`
+- `MONITORING_SETUP.md`
+- `PRODUCTION_DEPLOYMENT.md`
+- `USER_GUIDE.md`
+- `backup.sh`
+- `deploy-production.sh`
+- `logrotate.conf`
+- `nginx.conf`
+- `price-tracker-iraq.service`
+- `api/temp_function.sql`
+
+Recommendation:
+
+- publish only files that match the canonical API-first runtime story
+- move long-lived operational docs under `docs/`
+- keep executable deployment tooling under `scripts/`
+- avoid publishing duplicate root-level notes and one-off handoff documents

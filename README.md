@@ -1,60 +1,65 @@
-# Price Tracker Iraq — Standalone (بدون Supabase)
+# Price Tracker Iraq
 
-مشروع لتجميع أكبر عدد ممكن من المنتجات داخل العراق من مواقع حقيقية، مع **صورة + وصف** للمنتج.
+API-first price intelligence platform for the Iraqi market.
 
-الفكرة الأساسية في الـ ingestion:
-- **Sitemaps + Robots.txt** بدل Crawl عشوائي
-- Extract بدون Headless عبر: **JSON‑LD + __NEXT_DATA__ + OG meta**
-- **نخزن روابط الصور** (URL) بدل تخزين الصور داخل السيرفر
+The current repo combines:
+- product and offer ingestion from real sources
+- community price reporting
+- search, compare, alerts, notifications, and history
+- admin and operations tooling
 
----
+## Quick Start
 
-## التشغيل السريع (كبسة وحدة)
+Requirements:
+- Docker Desktop
+- Node.js 18+
 
-### المتطلبات
-- **Docker Desktop** (لتشغيل Postgres محلي)
-- **Node.js 18+**
+Windows:
 
-### Windows (PowerShell)
 ```powershell
 ./scripts/run-dev.ps1
 ```
 
-### macOS / Linux
+macOS / Linux:
+
 ```bash
 bash scripts/run-dev.sh
 ```
 
-بعد التشغيل:
-- الواجهة: `http://localhost:5173`
-- الـ API: `http://localhost:8787`
+After startup:
+- Web: `http://localhost:5173`
+- API: `http://localhost:8787`
 
-### دخول الإدارة
+Admin login:
 - Email: `admin@local`
 - Password: `admin123`
 
----
+## First Run
 
-## أول مرة — خلي المشروع “يعبي” بيانات
-1) افتح `/admin`
-2) من تبويب **حزم جاهزة للمصادر (Source Packs)**
-   - نصب: **حزمة العراق الكبرى (55 مصدر)**
-3) من تبويب **تشغيل**
-   - اضغط: **تشغيل الكل (Seed → APIs → Ingest → Images)**
+1. Open `/admin`
+2. Install the large Iraq source pack
+3. Run the full pipeline: seed, APIs, ingest, and images
 
-> ملاحظة: بعض المواقع ممكن تمنع بسرعة أو ما عدها Sitemap واضح. هذي طبيعي.
-> تقدر تختبر أي رابط بصفحة البلجنات وتضبط regex/entrypoints.
+## Repository Layout
 
----
+- `src/`: React frontend
+- `api/`: Hono API and jobs
+- `db/`: database bootstrap and seed scripts
+- `public/source-packs/`: source-pack JSON
+- `docs/`: architecture and runbooks
 
-## هيكل المشروع
-- `db/` — سكربتات بناء قاعدة البيانات + seed
-- `api/` — API + Jobs (seed/ingest/apis/images)
-- `public/source-packs/` — حزم JSON جاهزة لمواقع العراق
-- `src/` — الواجهة (React/Vite)
+## Production
 
----
+The canonical deployment story is documented in [docs/canonical-deployment.md](docs/canonical-deployment.md).
 
-## إذا تريد تشغيل على سيرفر (Production لاحقًا)
-النسخة الحالية مهيأة لتشتغل محليًا بسرعة.
-نقلها لسيرفر ممكن يصير بنفس الـ API + Postgres (مثل Neon) لاحقًا بدون تغيير كبير بالواجهة.
+Tracked production references:
+- [docs/canonical-deployment.md](docs/canonical-deployment.md)
+- [PROJECT_FULL_AUDIT.md](PROJECT_FULL_AUDIT.md)
+- [.env.production.example](.env.production.example)
+- [docker-compose.production.yml](docker-compose.production.yml)
+- [monitoring/prometheus.yml](monitoring/prometheus.yml)
+
+Notes:
+- The repo is API-first, not Supabase-first.
+- The frontend should be built once and served statically in staging and production.
+- Redis is optional locally and recommended in staging and production.

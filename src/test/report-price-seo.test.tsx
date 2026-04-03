@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
@@ -81,22 +81,28 @@ describe('ReportPrice SEO metadata', () => {
     document.querySelectorAll('meta[name="description"]').forEach((el) => el.remove());
   });
 
-  it('sets correct Arabic title', () => {
+  it('sets correct Arabic title', async () => {
     renderWithProviders(<ReportPrice />);
-    expect(document.title).toContain('الإبلاغ عن سعر جديد');
+    await waitFor(() => {
+      expect(document.title).toContain('الإبلاغ عن سعر جديد');
+    });
   });
 
-  it('sets description meta', () => {
+  it('sets description meta', async () => {
     renderWithProviders(<ReportPrice />);
-    const meta = document.querySelector('meta[name="description"]');
-    expect(meta).toBeTruthy();
-    expect(meta?.getAttribute('content')).toContain('سعر منتج موثّق');
+    await waitFor(() => {
+      const meta = document.querySelector('meta[name="description"]');
+      expect(meta).toBeTruthy();
+      expect(meta?.getAttribute('content')).toContain('سعر منتج موثّق');
+    });
   });
 
-  it('sets noindex for private form', () => {
+  it('sets noindex for private form', async () => {
     renderWithProviders(<ReportPrice />);
-    const robots = document.querySelector('meta[name="robots"]');
-    expect(robots).toBeTruthy();
-    expect(robots?.getAttribute('content')).toContain('noindex');
+    await waitFor(() => {
+      const robots = document.querySelector('meta[name="robots"]');
+      expect(robots).toBeTruthy();
+      expect(robots?.getAttribute('content')).toContain('noindex');
+    });
   });
 });
