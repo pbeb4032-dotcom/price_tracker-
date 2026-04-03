@@ -17,6 +17,7 @@ import { patchPublicationGateSchema } from './jobs/patchPublicationGateSchema';
 import { patchCanonicalIdentitySchema } from './jobs/patchCanonicalIdentitySchema';
 import { patchCatalogTaxonomyGovernanceSchema } from './jobs/patchCatalogTaxonomyGovernanceSchema';
 import { patchBarcodeResolutionSchema } from './jobs/patchBarcodeResolutionSchema';
+import { patchGovernedFxSchema } from './jobs/patchGovernedFxSchema';
 import { seedTaxonomyV2 } from './jobs/seedTaxonomyV2';
 import { validateCandidateSources } from './jobs/validateCandidateSources';
 import { activateCandidateSources } from './jobs/activateCandidateSources';
@@ -145,6 +146,16 @@ async function main() {
     logger.info('Barcode resolution schema patched successfully');
   } catch (e: any) {
     logger.warn('patchBarcodeResolutionSchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
+  }
+
+  try {
+    await patchGovernedFxSchema(env as any);
+    logger.info('Governed FX schema patched successfully');
+  } catch (e: any) {
+    logger.warn('patchGovernedFxSchema failed', {
       error: e?.message ?? e,
       stack: e?.stack,
     });
@@ -552,6 +563,10 @@ await db.execute(sql`
     await patchBarcodeResolutionSchema(env as any);
   });
 
+  void safeRun('patch_governed_fx_schema', async () => {
+    await patchGovernedFxSchema(env as any);
+  });
+
   void safeRun('seed_taxonomy_v2', async () => {
     await seedTaxonomyV2(env as any);
   });
@@ -669,6 +684,10 @@ await db.execute(sql`
 
   void safeRun('patch_barcode_resolution_schema', async () => {
     await patchBarcodeResolutionSchema(env as any);
+  });
+
+  void safeRun('patch_governed_fx_schema', async () => {
+    await patchGovernedFxSchema(env as any);
   });
 
   void safeRun('seed_taxonomy_v2', async () => {

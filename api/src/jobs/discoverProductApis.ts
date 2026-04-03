@@ -11,6 +11,7 @@ import {
   resolveLegacyCatalogMatch,
 } from '../ingestion/publicationGate';
 import { classifyGovernedTaxonomy } from '../catalog/taxonomyGovernance';
+import { getLatestFxRateForPricing } from '../fx/governedFx';
 
 const DEFAULT_FALLBACK_FX = 1470;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -38,14 +39,7 @@ export async function discoverProductApis(env: Env, opts?: { domain?: string; in
   const regionId = await ensureOnlineRegion(db);
 
   // FX
-  const fxRow = await db.execute(sql`
-    select mid_iqd_per_usd
-    from public.exchange_rates
-    where source_type='market' and is_active=true
-    order by rate_date desc
-    limit 1
-  `);
-  const fxRate = Number((fxRow.rows as any[])[0]?.mid_iqd_per_usd ?? DEFAULT_FALLBACK_FX);
+  const fxRate = await getLatestFxRateForPricing(db, DEFAULT_FALLBACK_FX);
 
   const src = await db.execute(sql`
     select id, domain, name_ar, coalesce(trust_weight_dynamic, trust_weight) as trust_weight

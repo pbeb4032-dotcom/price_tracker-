@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { getDb, type Env } from '../db';
+import { getLatestFxRateForPricing } from '../fx/governedFx';
 import { extractNumberLike, normalizeToIqdSmart, normalizeDomain } from '../ingestion/sanity';
 
 /**
@@ -22,20 +23,7 @@ export async function repairPricesFromRawText(
   const limit = Math.max(1, Math.min(200000, Number(opts?.limit ?? 50000)));
   const dryRun = Boolean(opts?.dryRun ?? false);
 
-  // FX fallback (only used when parsed currency != IQD)
-  let fxRate = 1470;
-  try {
-    const fx = await db.execute(sql`
-      select mid_iqd_per_usd::numeric as mid
-      from public.exchange_rates
-      order by observed_at desc nulls last
-      limit 1
-    `);
-    const v = Number((fx.rows as any[])[0]?.mid ?? 0);
-    if (Number.isFinite(v) && v > 500) fxRate = v;
-  } catch {
-    // ignore
-  }
+  const fxRate = await getLatestFxRateForPricing(db, 1470);
 
   const candidates = await db.execute(sql`
     select

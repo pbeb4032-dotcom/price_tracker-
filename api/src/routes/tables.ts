@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { sql } from 'drizzle-orm';
 import { getDb, type Env } from '../db';
 import type { AppAuthContext } from '../auth/appUser';
+import { getLatestFxPublications, mapFxPublicationsToLegacyRows } from '../fx/governedFx';
 
 type Ctx = { Bindings: Env; Variables: { auth: AppAuthContext | null } };
 
@@ -12,47 +13,8 @@ export const tableRoutes = new Hono<Ctx>();
 
 tableRoutes.get('/exchange_rates', async (c) => {
   const db = getDb(c.env);
-
-  const effective = await db.execute(sql`
-    select *
-    from public.fx_rate_effective
-    order by rate_date desc, updated_at desc
-    limit 1
-  `).catch(() => ({ rows: [] as any[] }));
-  const fx = (effective.rows as any[])[0] ?? null;
-
-  if (fx) {
-    const rows = [] as any[];
-    if (fx.official_rate != null) {
-      rows.push({
-        id: `gov-${fx.rate_date}`,
-        rate_date: fx.rate_date,
-        source_type: 'gov',
-        source_name: 'Gov: effective',
-        buy_iqd_per_usd: fx.official_rate,
-        sell_iqd_per_usd: fx.official_rate,
-        mid_iqd_per_usd: fx.official_rate,
-        is_active: true,
-        created_at: fx.updated_at ?? fx.created_at,
-        meta: { quality_flag: fx.quality_flag, ...(fx.meta?.gov ?? {}) },
-      });
-    }
-    if (fx.market_mid_baghdad != null) {
-      rows.push({
-        id: `market-${fx.rate_date}`,
-        rate_date: fx.rate_date,
-        source_type: 'market',
-        source_name: 'Market: effective',
-        buy_iqd_per_usd: fx.market_buy_baghdad,
-        sell_iqd_per_usd: fx.market_sell_baghdad,
-        mid_iqd_per_usd: fx.market_mid_baghdad,
-        is_active: true,
-        created_at: fx.updated_at ?? fx.created_at,
-        meta: { quality_flag: fx.quality_flag, ...(fx.meta?.market ?? {}) },
-      });
-    }
-    if (rows.length) return c.json(rows);
-  }
+  const governedRows = mapFxPublicationsToLegacyRows(await getLatestFxPublications(db));
+  if (governedRows.length) return c.json(governedRows);
 
   const r = await db.execute(sql`
     select * from public.exchange_rates

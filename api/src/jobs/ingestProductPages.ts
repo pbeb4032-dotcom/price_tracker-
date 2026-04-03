@@ -16,6 +16,7 @@ import {
   classifyGovernedTaxonomy,
   resolveMappedTaxonomyKey,
 } from '../catalog/taxonomyGovernance';
+import { getLatestFxRateForPricing } from '../fx/governedFx';
 import { computeRenderPriority } from '../lib/renderPriority';
 
 const BATCH_SIZE = 25;
@@ -347,14 +348,7 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
   try {
     const regionId = await ensureOnlineRegion(db);
 
-    const fxRow = await db.execute(sql`
-      select mid_iqd_per_usd
-      from public.exchange_rates
-      where source_type='market' and is_active=true
-      order by rate_date desc
-      limit 1
-    `);
-    const fxRate = Number((fxRow.rows as any[])[0]?.mid_iqd_per_usd ?? DEFAULT_FALLBACK_FX);
+    const fxRate = await getLatestFxRateForPricing(db, DEFAULT_FALLBACK_FX);
 
     const limit = Math.max(1, Math.min(4000, Number(opts?.limit ?? BATCH_SIZE)));
     const perDomain = Math.max(1, Math.min(200, Number((opts as any)?.perDomain ?? 40)));

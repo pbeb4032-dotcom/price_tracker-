@@ -42,6 +42,7 @@ import { patchPublicationGateSchema } from '../jobs/patchPublicationGateSchema';
 import { patchCanonicalIdentitySchema } from '../jobs/patchCanonicalIdentitySchema';
 import { patchCatalogTaxonomyGovernanceSchema } from '../jobs/patchCatalogTaxonomyGovernanceSchema';
 import { patchBarcodeResolutionSchema } from '../jobs/patchBarcodeResolutionSchema';
+import { patchGovernedFxSchema } from '../jobs/patchGovernedFxSchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
 import { backfillCanonicalIdentity } from '../jobs/backfillCanonicalIdentity';
@@ -53,6 +54,7 @@ import { autoTagSectorsCatalogDaily } from '../jobs/autoTagSectorsCatalogDaily';
 import { getCoverageStats } from '../jobs/coverageStats';
 import { getAppSetting } from '../lib/appSettings';
 import { patchAdminHealthSchema } from '../jobs/patchAdminHealthSchema';
+import { getLatestFxPublications, rolloverLatestFxPublicationToLegacy } from '../fx/governedFx';
 
 type Ctx = { Bindings: Env; Variables: { auth: AppAuthContext | null } };
 
@@ -1699,6 +1701,47 @@ adminRoutes.post('/jobs/fx_update_daily', async (c) => {
   return c.json(result);
 });
 
+adminRoutes.post('/jobs/patch_governed_fx_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchGovernedFxSchema(c.env);
+  return c.json(result);
+});
+
+adminRoutes.get('/fx_sources', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const rows = await gate.db.execute(sql`
+    select
+      id,
+      source_code,
+      source_name,
+      source_kind,
+      rate_type,
+      region_key,
+      fetch_url,
+      parser_type,
+      parser_version,
+      trust_score,
+      freshness_sla_minutes,
+      publication_enabled,
+      is_active,
+      priority,
+      meta,
+      updated_at
+    from public.fx_sources
+    order by rate_type asc, priority asc, source_name asc
+  `).catch(() => ({ rows: [] as any[] }));
+  return c.json({ ok: true, items: rows.rows ?? [] });
+});
+
+adminRoutes.get('/fx_publications/recent', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const items = await getLatestFxPublications(gate.db);
+  return c.json({ ok: true, items });
+});
+
 // Schema: add auto-disable columns for sources (bot challenge protection)
 adminRoutes.post('/jobs/patch_source_auto_disable_schema', async (c) => {
   const gate = await requireAdminOrInternal(c);
@@ -2242,35 +2285,8 @@ adminRoutes.post('/category_conflicts/:id/review', async (c) => {
 adminRoutes.post('/jobs/fx_rollover_today', async (c) => {
   const gate = await requireAdminOrInternal(c);
   if (!gate.ok || !gate.db) return gate.res!;
-
-  const r = await gate.db.execute(sql`
-    with latest as (
-      select source_type, source_name, buy_iqd_per_usd, sell_iqd_per_usd, mid_iqd_per_usd
-      from public.exchange_rates
-      where rate_date = (select max(rate_date) from public.exchange_rates)
-    ), ins as (
-      insert into public.exchange_rates (
-        rate_date, source_type, source_name,
-        buy_iqd_per_usd, sell_iqd_per_usd, mid_iqd_per_usd,
-        is_active
-      )
-      select
-        current_date,
-        source_type,
-        source_name,
-        buy_iqd_per_usd,
-        sell_iqd_per_usd,
-        mid_iqd_per_usd,
-        true
-      from latest
-      on conflict (rate_date, source_type, source_name) do nothing
-      returning 1
-    )
-    select coalesce(count(*),0)::int as inserted from ins;
-  `);
-
-  const inserted = (r.rows as any[])[0]?.inserted ?? 0;
-  return c.json({ ok: true, job: 'fx_rollover_today', result: { inserted } });
+  const result = await rolloverLatestFxPublicationToLegacy(gate.db);
+  return c.json({ ok: true, job: 'fx_rollover_today', result });
 });
 
 // -----------------------------

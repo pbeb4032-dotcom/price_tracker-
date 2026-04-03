@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { getDb, type Env } from '../db';
+import { getLatestFxRateForPricing } from '../fx/governedFx';
 
 /**
  * Repair legacy offers where USD prices were stored as tiny IQD (e.g., 110 instead of 110*FX).
@@ -20,14 +21,7 @@ export async function repairSmallUsdPrices(
   const max = Number(opts?.max ?? 999);
   const dryRun = Boolean(opts?.dryRun ?? false);
 
-  const fxRow = await db.execute(sql`
-    select mid_iqd_per_usd
-    from public.exchange_rates
-    where source_type='market' and is_active=true
-    order by rate_date desc
-    limit 1
-  `).catch(() => ({ rows: [] as any[] }));
-  const fxRate = Number((fxRow.rows as any[])[0]?.mid_iqd_per_usd ?? 1470);
+  const fxRate = await getLatestFxRateForPricing(db, 1470);
 
   const rows = await db.execute(sql`
     select
