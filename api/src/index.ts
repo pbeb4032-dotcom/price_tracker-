@@ -9,6 +9,9 @@ import { tableRoutes } from './routes/tables';
 import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
 import { offerRoutes } from './routes/offers';
+import { swaggerUI } from '@hono/swagger-ui';
+import { getSystemMetrics } from './lib/monitoring';
+import { getMetrics } from './lib/metrics';
 
 const app = new Hono<{ Bindings: Env; Variables: { auth: AppAuthContext | null } }>();
 
@@ -37,7 +40,40 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-app.get('/health', (c) => c.json({ ok: true }));
+app.get('/health', async (c) => {
+  try {
+    const metrics = await getSystemMetrics(c.env);
+    return c.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '0.2.0',
+      environment: process.env.NODE_ENV || 'development',
+      uptime: metrics.uptime,
+      memory: metrics.memory,
+      database: metrics.database,
+    });
+  } catch (error) {
+    return c.json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 503);
+  }
+});
+
+app.get('/metrics', async (c) => {
+  try {
+    const metricsData = await getMetrics();
+    c.header('Content-Type', 'text/plain; charset=utf-8');
+    return c.text(metricsData);
+  } catch (error) {
+    return c.json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 500);
+  }
+});
 
 app.route('/auth', authRoutes);
 app.route('/rpc', rpcRoutes);
@@ -45,5 +81,74 @@ app.route('/views', viewRoutes);
 app.route('/tables', tableRoutes);
 app.route('/offers', offerRoutes);
 app.route('/admin', adminRoutes);
+
+// API Documentation
+app.get('/docs', swaggerUI({
+  url: '/openapi.json',
+}));
+
+app.get('/openapi.json', (c) => {
+  return c.json({
+    openapi: '3.0.0',
+    info: {
+      title: 'Price Tracker Iraq API',
+      version: '0.2.0',
+      description: 'API for tracking product prices across Iraqi e-commerce platforms',
+    },
+    servers: [
+      {
+        url: 'http://localhost:8787',
+        description: 'Development server',
+      },
+      {
+        url: 'https://api.price-tracker-iraq.com',
+        description: 'Production server',
+      },
+    ],
+    paths: {
+      '/health': {
+        get: {
+          summary: 'Health check',
+          responses: {
+            200: {
+              description: 'API is healthy',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      status: { type: 'string' },
+                      timestamp: { type: 'string' },
+                      version: { type: 'string' },
+                      environment: { type: 'string' },
+                      uptime: { type: 'number' },
+                      memory: { type: 'object' },
+                      database: { type: 'object' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/metrics': {
+        get: {
+          summary: 'Prometheus metrics',
+          responses: {
+            200: {
+              description: 'Metrics in Prometheus format',
+              content: {
+                'text/plain': {
+                  schema: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+});
 
 export default app;

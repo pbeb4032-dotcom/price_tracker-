@@ -1,10 +1,11 @@
 import { getApiToken } from './token';
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+const env = (import.meta as any).env ?? {};
+const API_BASE = (env.VITE_API_BASE_URL || env.VITE_API_URL) as string | undefined;
 
 function requireBase() {
   if (!API_BASE) {
-    throw new Error('Missing VITE_API_BASE_URL');
+    throw new Error('Missing VITE_API_BASE_URL or VITE_API_URL');
   }
 }
 

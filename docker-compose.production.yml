@@ -50,7 +50,7 @@ services:
       - REDIS_URL=${REDIS_URL}
       - NODE_ENV=production
       - API_PORT=8787
-      - JWT_SECRET=${JWT_SECRET}
+      - APP_JWT_SECRET=${APP_JWT_SECRET}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
@@ -68,7 +68,7 @@ services:
       - price-tracker-prod
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8787/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -78,13 +78,39 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
     container_name: price-tracker-web-prod
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
-      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     depends_on:
       - api
+    networks:
+      - price-tracker-prod
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: price-tracker-postgres-exporter-prod
+    environment:
+      DATA_SOURCE_NAME: postgresql://price_tracker_prod:${DB_PASSWORD:-secure_password_prod}@postgres:5432/price_tracker_prod?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - price-tracker-prod
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: price-tracker-redis-exporter-prod
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - price-tracker-prod
     restart: unless-stopped
@@ -105,6 +131,10 @@ services:
       - '--web.enable-lifecycle'
     ports:
       - "9090:9090"
+    depends_on:
+      - api
+      - postgres-exporter
+      - redis-exporter
     networks:
       - price-tracker-prod
     restart: unless-stopped

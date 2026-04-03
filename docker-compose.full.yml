@@ -73,13 +73,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
-    environment:
-      VITE_API_BASE_URL: http://localhost:8787
-      CHOKIDAR_USEPOLLING: "true"
+      args:
+        VITE_API_BASE_URL: http://localhost:8787
+        VITE_API_URL: ""
+        VITE_SUPABASE_URL: ""
+        VITE_SUPABASE_ANON_KEY: ""
+        VITE_CLERK_PUBLISHABLE_KEY: ""
     depends_on:
       - api
     ports:
-      - "8080:8080"
+      - "8080:80"
 
 volumes:
   dbdata:

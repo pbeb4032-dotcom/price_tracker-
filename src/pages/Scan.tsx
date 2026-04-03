@@ -10,7 +10,11 @@ import { useCompareOffers, isSuspectedOffer } from '@/hooks/offers/useApiCompari
 import { formatIQDPrice } from '@/lib/offers/normalization';
 import { OfferReliabilityBadge } from '@/components/offers/OfferReliabilityBadge';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? '';
+const API_BASE = (
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+  (import.meta.env.VITE_API_URL as string | undefined) ||
+  ''
+).replace(/\/$/, '');
 
 type LookupResult = {
   ok?: boolean;

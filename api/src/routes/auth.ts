@@ -22,6 +22,29 @@ const signInSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
+async function parseBody<T>(c: any, schema: z.ZodType<T>) {
+  const body = await c.req.json().catch(() => null);
+  const parsed = schema.safeParse(body);
+
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      response: c.json(
+        {
+          error: 'INVALID_REQUEST',
+          details: parsed.error.flatten(),
+        },
+        400
+      ),
+    };
+  }
+
+  return {
+    ok: true as const,
+    data: parsed.data,
+  };
+}
+
 function encodePassword(password: string) {
   const iterations = 120_000;
   const salt = randomBytes(16).toString('base64');
@@ -58,7 +81,10 @@ async function ensurePasswordRow(db: any, userId: string, password: string) {
 }
 
 authRoutes.post('/signup', async (c) => {
-  const body = signUpSchema.parse(await c.req.json());
+  const parsed = await parseBody(c, signUpSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const body = parsed.data;
   const db = getDb(c.env);
 
   // If email already exists, reject.
@@ -82,7 +108,10 @@ authRoutes.post('/signup', async (c) => {
 });
 
 authRoutes.post('/login', async (c) => {
-  const body = signInSchema.parse(await c.req.json());
+  const parsed = await parseBody(c, signInSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const body = parsed.data;
   const db = getDb(c.env);
 
   const r = await db.execute(sql`

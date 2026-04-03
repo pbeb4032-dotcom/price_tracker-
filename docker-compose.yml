@@ -3,18 +3,64 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: price_tracker_iraq
     ports:
-      - "54321:5432"
+      - "${DB_PORT:-54321}:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d price_tracker_iraq"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-postgres}@db:5432/price_tracker_iraq
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      INTERNAL_JOB_SECRET: ${INTERNAL_JOB_SECRET}
+      API_PORT: 8787
+      NODE_ENV: production
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_ENVIRONMENT: production
+      LOG_LEVEL: warn
+      ENABLE_LOCAL_SCHEDULER: "1"
+      DB_POOL_MAX: "25"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./api/logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8787/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8787}
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
 
 volumes:
   dbdata:

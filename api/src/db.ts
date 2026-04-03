@@ -26,3 +26,7 @@ export function getDb(env: Env) {
   }
   return drizzle(pool);
 }
+
+export function resetDbPoolForTests() {
+  pool = null;
+}

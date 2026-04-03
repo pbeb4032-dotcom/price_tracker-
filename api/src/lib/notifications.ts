@@ -5,19 +5,28 @@ import { getLogger } from './monitoring.js';
 // Email configuration
 let emailTransporter: nodemailer.Transporter | null = null;
 
+function ensureEmailTransporter(): nodemailer.Transporter | null {
+  if (emailTransporter) return emailTransporter;
+  if (!process.env.SMTP_HOST) return null;
+
+  emailTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  return emailTransporter;
+}
+
 export const initializeNotifications = async () => {
+  emailTransporter = null;
+
   // Initialize email transporter
-  if (process.env.SMTP_HOST) {
-    emailTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-  }
+  ensureEmailTransporter();
 
   // Initialize web push
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -40,13 +49,14 @@ export const sendEmailNotification = async (
   html: string,
   text?: string
 ): Promise<boolean> => {
-  if (!emailTransporter) {
+  const transporter = ensureEmailTransporter();
+  if (!transporter) {
     getLogger().warn('Email transporter not configured');
     return false;
   }
 
   try {
-    await emailTransporter.sendMail({
+    await transporter.sendMail({
       from: process.env.SMTP_FROM || 'Price Tracker Iraq <noreply@price-tracker-iraq.com>',
       to,
       subject,

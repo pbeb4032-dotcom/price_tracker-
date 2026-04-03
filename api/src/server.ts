@@ -21,6 +21,22 @@ import { autoTagSectorsCatalogDaily } from './jobs/autoTagSectorsCatalogDaily';
 import { patchAppSettingsSchemaJob } from './jobs/patchAppSettingsSchema';
 import { patchAdminHealthSchema } from './jobs/patchAdminHealthSchema';
 
+// Monitoring imports
+import {
+  initSentry,
+  getLogger,
+  createPerformanceMiddleware,
+  getSystemMetrics,
+  monitorBackgroundJob,
+  withErrorReporting
+} from './lib/monitoring';
+
+// New feature imports
+import { initializeRedis } from './lib/cache.js';
+import { initializeNotifications } from './lib/notifications.js';
+import { metricsMiddleware, metrics } from './lib/metrics.js';
+import { createRateLimiter } from './lib/rate-limiting.js';
+
 // Load root .env (repo root)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,12 +56,31 @@ for (const candidate of envCandidates) {
     }
   } catch {}
 }
-console.log(`[api] env loaded from: ${envLoadedFrom ?? '(none)'}`);
 
+// Initialize monitoring
+const logger = getLogger();
+logger.info(`[api] env loaded from: ${envLoadedFrom ?? '(none)'}`);
+
+// Initialize Sentry (if configured)
+initSentry({
+  SENTRY_DSN: process.env.SENTRY_DSN,
+  SENTRY_ENVIRONMENT: process.env.NODE_ENV || 'development',
+  LOG_LEVEL: process.env.LOG_LEVEL,
+  ENABLE_PROFILING: process.env.ENABLE_SENTRY_PROFILING === 'true',
+});
+
+// Initialize Redis cache
+await initializeRedis();
+
+// Initialize notifications
+await initializeNotifications();
+
+// Initialize metrics collection
+logger.info('All services initialized successfully');
 
 const env = {
   DATABASE_URL: process.env.DATABASE_URL || '',
-  APP_JWT_SECRET: process.env.APP_JWT_SECRET || '',
+  APP_JWT_SECRET: process.env.APP_JWT_SECRET || process.env.JWT_SECRET || '',
   INTERNAL_JOB_SECRET: process.env.INTERNAL_JOB_SECRET,
   DEV_LOGIN_SECRET: process.env.DEV_LOGIN_SECRET,
 };
@@ -53,35 +88,55 @@ const env = {
 const port = Number(process.env.API_PORT || 8787);
 
 async function main() {
+  logger.info('Starting Price Tracker API server', {
+    port,
+    environment: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+  });
+
   // Preflight: patch minimal schema needed by admin/health endpoints.
   // This avoids "first request 500" on older DB volumes.
   try {
     await patchAdminHealthSchema(env as any);
+    logger.info('Admin health schema patched successfully');
   } catch (e: any) {
-    console.warn('[api] patchAdminHealthSchema failed:', e?.message ?? e);
+    logger.warn('patchAdminHealthSchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
   }
+
+  // Add middleware to the app
+  app.use('*', metricsMiddleware);
+  app.use('*', createRateLimiter());
 
   serve({
     port,
     fetch: (req) => app.fetch(req, env as any),
   });
 
-  console.log(`[api] listening on http://localhost:${port}`);
+  logger.info('API server started successfully', {
+    port,
+    healthEndpoint: `http://localhost:${port}/health`,
+  });
 
-
-// Optional local scheduler (dev/standalone): dispatch price alerts + recompute trust periodically.
-// In production/Supabase, use pg_cron or the provided edge functions instead.
+  // Optional local scheduler (dev/standalone): dispatch price alerts + recompute trust periodically.
+  // In production/Supabase, use pg_cron or the provided edge functions instead.
   const enableScheduler = (process.env.ENABLE_LOCAL_SCHEDULER ?? '1') !== '0';
   if (enableScheduler) {
+    logger.info('Local scheduler enabled');
 
-  let db;
-  try {
-    db = getDb(env as any);
-  } catch (e: any) {
-    console.error('[api] FATAL: DB is not configured. Check DATABASE_URL in .env');
-    console.error(e?.message ?? e);
-    process.exit(1);
-  }
+    let db;
+    try {
+      db = getDb(env as any);
+      logger.info('Database connection established');
+    } catch (e: any) {
+      logger.error('FATAL: Database connection failed', {
+        error: e?.message ?? e,
+        stack: e?.stack,
+      });
+      process.exit(1);
+    }
 
   // One-time schema compatibility (non-destructive) for Shadow Mode + health rollups + public-safe views.
   void safeRun('schema_compat_shadow_health', async () => {
@@ -295,24 +350,30 @@ await db.execute(sql`
   async function safeRun(label: string, fn: () => Promise<void>) {
     try {
       await fn();
+      logger.debug(`Scheduler task completed: ${label}`);
     } catch (e) {
-      console.warn(`[scheduler] ${label} failed:`, (e as any)?.message ?? e);
+      logger.warn(`Scheduler task failed: ${label}`, {
+        error: (e as any)?.message ?? e,
+        stack: (e as any)?.stack,
+      });
     }
   }
 
   // Dispatch triggered alerts into notifications every 10 minutes.
   setInterval(() => {
-    void safeRun('dispatch_price_alerts', async () => {
-      await db.execute(sql`
+    void safeRun('dispatch_price_alerts', monitorBackgroundJob('dispatch_price_alerts', async () => {
+      const result = await db.execute(sql`
         select count(*)::int as inserted
         from public.enqueue_triggered_price_alert_notifications(200, 180)
       `);
-    });
+      const inserted = (result.rows as any[])[0]?.inserted || 0;
+      logger.info('Price alerts dispatched', { count: inserted });
+    }));
   }, 10 * 60 * 1000);
 
   // Recompute dynamic trust weights hourly (health + anomalies + crowd reports).
   setInterval(() => {
-    void safeRun('recompute_trust', async () => {
+    void safeRun('recompute_trust', monitorBackgroundJob('recompute_trust', async () => {
       await db.execute(sql`
         alter table public.price_sources
           add column if not exists trust_weight_dynamic numeric(3,2),
@@ -403,7 +464,8 @@ await db.execute(sql`
         from calc c
         where ps.id = c.id
       `);
-    });
+      logger.info('Trust weights recomputed for all sources');
+    }));
   }, 60 * 60 * 1000);
 
   
@@ -442,16 +504,18 @@ await db.execute(sql`
 
   // Roll up source health every hour (used by Source Health Dashboard)
   setInterval(() => {
-    void safeRun('rollup_source_health', async () => {
+    void safeRun('rollup_source_health', monitorBackgroundJob('rollup_source_health', async () => {
       await rollupSourceHealth(env as any, { hours: 24 });
-    });
+      logger.info('Source health rolled up');
+    }));
   }, 60 * 60 * 1000);
 
   // FX update: best-effort refresh every 6 hours (keeps gov/market rows current)
   setInterval(() => {
-    void safeRun('fx_update_daily', async () => {
+    void safeRun('fx_update_daily', monitorBackgroundJob('fx_update_daily', async () => {
       await fxUpdateDaily(env as any, {});
-    });
+      logger.info('FX rates updated');
+    }));
   }, 6 * 60 * 60 * 1000);
 
   // Shadow automation: validate candidates periodically; optional auto-activate passed candidates.
@@ -496,9 +560,17 @@ await db.execute(sql`
   }
 
 
-  console.log('[scheduler] ENABLE_LOCAL_SCHEDULER=1 (alerts every 10m, trust every 60m, health every 60m)');
+  logger.info('Local scheduler enabled', {
+    alertsInterval: '10 minutes',
+    trustRecomputeInterval: '60 minutes',
+    healthRollupInterval: '60 minutes',
+    fxUpdateInterval: '6 hours',
+    autoDiscoveryInterval: '20 minutes',
+    autoSectorTagInterval: '30 minutes',
+  });
   } else {
   // Scheduler disabled — still run the critical one-time startup patches so the app works.
+  logger.info('Local scheduler disabled, running one-time startup patches only');
   const safeRun = async (label: string, fn: () => Promise<void>) => {
     try { await fn(); } catch (e) { console.warn(`[startup] ${label} failed:`, (e as any)?.message ?? e); }
   };
@@ -531,10 +603,21 @@ await db.execute(sql`
     await fxUpdateDaily(env as any, {});
   });
 
-  console.log('[startup] ENABLE_LOCAL_SCHEDULER=0 (ran one-time startup patches only)');
+  logger.info('Startup patches completed, scheduler disabled');
   }
 
 }
 
-// fire and forget
-void main();
+// Create logs directory if it doesn't exist
+import { mkdirSync } from 'fs';
+try {
+  mkdirSync('logs', { recursive: true });
+} catch (error) {
+  // Directory might already exist, ignore
+}
+
+// Start the server
+void main().catch((error) => {
+  console.error('FATAL: Server startup failed:', error);
+  process.exit(1);
+});
