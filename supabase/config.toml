@@ -1,0 +1,37 @@
+project_id = "kqwqoqflhfsnyajtjvpl"
+
+[functions.dispatch-price-alerts]
+verify_jwt = false
+
+[functions.send-web-push]
+verify_jwt = false
+
+[functions.send-email-notifications]
+verify_jwt = false
+
+[functions.recrawl-product-images]
+verify_jwt = false
+
+[functions.seed-crawl-frontier]
+verify_jwt = false
+
+[functions.ingest-product-pages]
+verify_jwt = false
+
+[functions.firecrawl-scrape]
+verify_jwt = false
+
+[functions.discover-product-apis]
+verify_jwt = false
+
+[functions.smart-image-discovery]
+verify_jwt = false
+
+[functions.refresh-prices]
+verify_jwt = false
+
+[functions.ai-product-scraper]
+verify_jwt = false
+
+[functions.direct-scraper]
+verify_jwt = false

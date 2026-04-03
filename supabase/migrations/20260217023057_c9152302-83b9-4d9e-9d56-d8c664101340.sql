@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.search_products_engine(text, uuid, jsonb, integer, integer, text) TO anon, authenticated;

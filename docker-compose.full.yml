@@ -1,0 +1,86 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: price_tracker_iraq
+    ports:
+      - "54321:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d price_tracker_iraq"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "8081:8080"
+    environment:
+      - BASE_URL=http://localhost:8081/
+    volumes:
+      - searxng-data:/etc/searxng
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/price_tracker_iraq
+      APP_JWT_SECRET: dev-secret-change-me
+      INTERNAL_JOB_SECRET: job-secret
+      API_PORT: "8787"
+      ENABLE_LOCAL_SCHEDULER: "1"
+      DB_POOL_MAX: "25"
+      SEARXNG_URL: http://searxng:8080
+      ENABLE_SHADOW_AUTOMATION: "1"
+      RENDER_QUEUE_ENABLED: "true"
+      RENDER_WAIT_MIN: "25"
+      SHADOW_AUTO_ACTIVATE: "0"
+      FX_MARKET_PREMIUM_PCT: "0.12"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8787:8787"
+
+  render_worker:
+    build:
+      context: ./render-worker
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/price_tracker_iraq
+      RENDER_GLOBAL_CONCURRENCY: "2"
+      RENDER_WORKER_POLL_MS: "1000"
+      RENDER_MIN_DELAY_MS: "800"
+      RENDER_CACHE_TTL_MIN: "720"
+      RENDER_MAX_HTML_CHARS: "600000"
+      RENDER_MAX_ATTEMPTS: "4"
+      RENDER_BACKOFF_BASE_MIN: "15"
+      RENDER_BUDGET_PER_HOUR_DEFAULT: "80"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      VITE_API_BASE_URL: http://localhost:8787
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      - api
+    ports:
+      - "8080:8080"
+
+volumes:
+  dbdata:
+  searxng-data:

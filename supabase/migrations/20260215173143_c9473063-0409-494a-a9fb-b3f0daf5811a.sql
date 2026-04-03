@@ -1,0 +1,2 @@
+ALTER TABLE public.source_price_observations DROP CONSTRAINT source_price_observations_evidence_type_check;
+ALTER TABLE public.source_price_observations ADD CONSTRAINT source_price_observations_evidence_type_check CHECK (evidence_type = ANY (ARRAY['url'::text, 'screenshot'::text, 'api'::text, 'ai_scrape'::text]));

@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-02-22T15:26:22Z",
+  "packs": [
+    {
+      "id": "iraq-mega-55",
+      "name_ar": "حزمة العراق الكبرى (55 مصدر)",
+      "description_ar": "مقترحة كبداية: متاجر + ماركات + منصات داخل العراق. (آمنة ومناسبة للـ Sitemap + JSON-LD/NextData بدون Headless).",
+      "file": "iraq-mega-55.json",
+      "count": 55,
+      "recommended": true,
+      "tags": [
+        "العراق",
+        "متاجر",
+        "Sitemap",
+        "JSON-LD"
+      ]
+    },
+    {
+      "id": "iraq-all-60",
+      "name_ar": "حزمة العراق الشاملة (60 مصدر)",
+      "description_ar": "أوسع من الكبرى وتضيف مصادر إضافية (قد تكون خدمات/مؤسسات). استخدمها إذا تريد Coverage أوسع.",
+      "file": "iraq-all-60.json",
+      "count": 60,
+      "recommended": false,
+      "tags": [
+        "العراق",
+        "شاملة",
+        "تنوع"
+      ]
+    }
+  ]
+}

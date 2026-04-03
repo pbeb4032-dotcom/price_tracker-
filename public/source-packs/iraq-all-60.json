@@ -1,0 +1,3999 @@
+{
+  "id": "iraq-all-60",
+  "name_ar": "حزمة العراق الشاملة (60 مصدر)",
+  "description_ar": "حزمة أوسع تشمل مصادر إضافية (بعضها خدمات/مؤسسات). إذا تريد تغطية أوسع للروابط داخل العراق.",
+  "version": "1.0",
+  "generated_at": "2026-02-22T15:26:12Z",
+  "plugins": [
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "miswag.com",
+        "name_ar": "مسواك",
+        "source_kind": "retailer",
+        "trust_weight": 0.82,
+        "is_active": true,
+        "base_url": "https://miswag.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "miswag.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://miswag.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://miswag.com/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "orisdi.com",
+        "name_ar": "أورزدي",
+        "source_kind": "marketplace",
+        "trust_weight": 0.72,
+        "is_active": true,
+        "base_url": "https://orisdi.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "orisdi.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://orisdi.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://orisdi.com/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "jum3a.com",
+        "name_ar": "جمعة",
+        "source_kind": "marketplace",
+        "trust_weight": 0.7,
+        "is_active": true,
+        "base_url": "https://jum3a.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "jum3a.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://jum3a.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://jum3a.com/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "toolmart.me",
+        "name_ar": "تولمارت",
+        "source_kind": "retailer",
+        "trust_weight": 0.65,
+        "is_active": true,
+        "base_url": "https://toolmart.me",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "toolmart.me",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://toolmart.me",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://toolmart.me/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "www.elryan.com",
+        "name_ar": "الريان",
+        "source_kind": "retailer",
+        "trust_weight": 0.75,
+        "is_active": true,
+        "base_url": "https://www.elryan.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "www.elryan.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.elryan.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "www.amal.com",
+        "name_ar": "أمل",
+        "source_kind": "marketplace",
+        "trust_weight": 0.65,
+        "is_active": true,
+        "base_url": "https://www.amal.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "www.amal.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.amal.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "store.alnabaa.com",
+        "name_ar": "النبأ ستور",
+        "source_kind": "retailer",
+        "trust_weight": 0.7,
+        "is_active": true,
+        "base_url": "https://store.alnabaa.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "store.alnabaa.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://store.alnabaa.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://store.alnabaa.com/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "iq.opensooq.com",
+        "name_ar": "السوق المفتوح (العراق)",
+        "source_kind": "marketplace",
+        "trust_weight": 0.6,
+        "is_active": true,
+        "base_url": "https://iq.opensooq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "iq.opensooq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://iq.opensooq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "alhafidh.com",
+        "name_ar": "الحافظ",
+        "source_kind": "retailer",
+        "trust_weight": 0.72,
+        "is_active": true,
+        "base_url": "https://alhafidh.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "alhafidh.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://alhafidh.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://alhafidh.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "zaytoona.com",
+        "name_ar": "زيتونة",
+        "source_kind": "retailer",
+        "trust_weight": 0.7,
+        "is_active": true,
+        "base_url": "https://zaytoona.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "zaytoona.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://zaytoona.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "dania.iq",
+        "name_ar": "دانية",
+        "source_kind": "retailer",
+        "trust_weight": 0.68,
+        "is_active": true,
+        "base_url": "https://dania.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "dania.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://dania.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://dania.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "thebodyshop.iq",
+        "name_ar": "ذا بودي شوب العراق",
+        "source_kind": "official",
+        "trust_weight": 0.7,
+        "is_active": true,
+        "base_url": "https://www.thebodyshop.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "thebodyshop.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.thebodyshop.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://www.thebodyshop.iq/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        },
+        {
+          "url": "https://www.thebodyshop.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "3d-iraq.com",
+        "name_ar": "3D Iraq",
+        "source_kind": "retailer",
+        "trust_weight": 0.62,
+        "is_active": true,
+        "base_url": "https://3d-iraq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "3d-iraq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://3d-iraq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "istyle.iq",
+        "name_ar": "iSTYLE Iraq",
+        "source_kind": "official",
+        "trust_weight": 0.7,
+        "is_active": true,
+        "base_url": "https://istyle.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "istyle.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://istyle.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://istyle.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "alsamah.iq",
+        "name_ar": "السمـاح (Allawi Group)",
+        "source_kind": "retailer",
+        "trust_weight": 0.62,
+        "is_active": true,
+        "base_url": "https://www.alsamah.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "alsamah.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.alsamah.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://www.alsamah.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "casioiraq.iq",
+        "name_ar": "كاسيو العراق",
+        "source_kind": "official",
+        "trust_weight": 0.62,
+        "is_active": true,
+        "base_url": "https://casioiraq.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "casioiraq.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://casioiraq.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://casioiraq.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "dolphin.com.iq",
+        "name_ar": "دولفين",
+        "source_kind": "retailer",
+        "trust_weight": 0.6,
+        "is_active": true,
+        "base_url": "https://dolphin.com.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "dolphin.com.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://dolphin.com.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://dolphin.com.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "rkns.com.iq",
+        "name_ar": "RKNS Store",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://rkns.com.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "rkns.com.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://rkns.com.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://rkns.com.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "store.ad.com.iq",
+        "name_ar": "AD Store",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://store.ad.com.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "store.ad.com.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://store.ad.com.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://store.ad.com.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "alamancompany.iq",
+        "name_ar": "شركة الأمان",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://alamancompany.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "alamancompany.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://alamancompany.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://alamancompany.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "ibazzar.com",
+        "name_ar": "iBazzar",
+        "source_kind": "marketplace",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://ibazzar.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "ibazzar.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://ibazzar.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "naram.com",
+        "name_ar": "نارام",
+        "source_kind": "marketplace",
+        "trust_weight": 0.62,
+        "is_active": true,
+        "base_url": "https://naram.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "naram.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://naram.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://naram.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "hotiqdeals.com",
+        "name_ar": "Hotiqdeals",
+        "source_kind": "retailer",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://hotiqdeals.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "hotiqdeals.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://hotiqdeals.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "iqstr.com",
+        "name_ar": "IQ Store",
+        "source_kind": "retailer",
+        "trust_weight": 0.56,
+        "is_active": true,
+        "base_url": "https://iqstr.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "iqstr.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://iqstr.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://iqstr.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "jibalzone.com",
+        "name_ar": "Jibal Zone",
+        "source_kind": "retailer",
+        "trust_weight": 0.56,
+        "is_active": true,
+        "base_url": "https://www.jibalzone.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "jibalzone.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.jibalzone.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://www.jibalzone.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "card-quick.com",
+        "name_ar": "Card Quick",
+        "source_kind": "retailer",
+        "trust_weight": 0.54,
+        "is_active": true,
+        "base_url": "https://www.card-quick.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "card-quick.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.card-quick.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "azuiq.com",
+        "name_ar": "AzuIQ",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://azuiq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "azuiq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://azuiq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "jubrancoffee.com",
+        "name_ar": "قهوة جبران المختصة",
+        "source_kind": "retailer",
+        "trust_weight": 0.6,
+        "is_active": true,
+        "base_url": "https://jubrancoffee.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "jubrancoffee.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://jubrancoffee.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "classicocenter.com",
+        "name_ar": "كلاسيكو سنتر",
+        "source_kind": "retailer",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://classicocenter.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "classicocenter.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://classicocenter.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "inpaket.com",
+        "name_ar": "InPaket",
+        "source_kind": "marketplace",
+        "trust_weight": 0.56,
+        "is_active": true,
+        "base_url": "https://inpaket.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "inpaket.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://inpaket.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "alfarah-store.com",
+        "name_ar": "Al Farah Store",
+        "source_kind": "retailer",
+        "trust_weight": 0.56,
+        "is_active": true,
+        "base_url": "https://alfarah-store.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "alfarah-store.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://alfarah-store.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "maximalliq.com",
+        "name_ar": "Maximall",
+        "source_kind": "retailer",
+        "trust_weight": 0.56,
+        "is_active": true,
+        "base_url": "https://maximalliq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "maximalliq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://maximalliq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://maximalliq.com/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "pcdukan.iq",
+        "name_ar": "Dukan Iraq (PC Dukan)",
+        "source_kind": "retailer",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://pcdukan.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "pcdukan.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://pcdukan.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://pcdukan.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "ledamasiraq.com",
+        "name_ar": "Ledamas Iraq",
+        "source_kind": "retailer",
+        "trust_weight": 0.56,
+        "is_active": true,
+        "base_url": "https://ledamasiraq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "ledamasiraq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://ledamasiraq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "monropoultry.com",
+        "name_ar": "Monro Poultry",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://monropoultry.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "monropoultry.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://monropoultry.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "naayiq.com",
+        "name_ar": "NaayIQ Beauty",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://www.naayiq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "naayiq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.naayiq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "iraqdutyfree.com",
+        "name_ar": "Iraq Duty Free",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://www.iraqdutyfree.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "iraqdutyfree.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.iraqdutyfree.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "gsw-iraq.com",
+        "name_ar": "GSW Iraq",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://gsw-iraq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "gsw-iraq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://gsw-iraq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://gsw-iraq.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "mukaabat.com",
+        "name_ar": "Mukaabat (LEGO العراق)",
+        "source_kind": "retailer",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://www.mukaabat.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "mukaabat.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.mukaabat.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "siartna.com",
+        "name_ar": "سيارتنا (قطع غيار)",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://siartna.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "siartna.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://siartna.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://siartna.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "irqcosmetics.com",
+        "name_ar": "IRQ Cosmetics",
+        "source_kind": "retailer",
+        "trust_weight": 0.56,
+        "is_active": true,
+        "base_url": "https://irqcosmetics.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "irqcosmetics.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://irqcosmetics.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "dinarhome.com",
+        "name_ar": "DinarHome",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://dinarhome.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "dinarhome.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://dinarhome.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "bazzaar.com",
+        "name_ar": "Bazzaar",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://bazzaar.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "bazzaar.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://bazzaar.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://bazzaar.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "rawat-sahra-iraq.iq",
+        "name_ar": "Rawat Sahra Iraq",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://rawat-sahra-iraq.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "rawat-sahra-iraq.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://rawat-sahra-iraq.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://rawat-sahra-iraq.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "www.gt-agri.com",
+        "name_ar": "GT Agri",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://www.gt-agri.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "www.gt-agri.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.gt-agri.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://www.gt-agri.com/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "iq.mikesport.com",
+        "name_ar": "Mike Sport Iraq",
+        "source_kind": "official",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://iq.mikesport.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "iq.mikesport.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://iq.mikesport.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "www.lcwaikiki.iq",
+        "name_ar": "LC Waikiki Iraq",
+        "source_kind": "official",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://www.lcwaikiki.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "www.lcwaikiki.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.lcwaikiki.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://www.lcwaikiki.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "iraq.feel22.com",
+        "name_ar": "Feel22 العراق",
+        "source_kind": "marketplace",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://iraq.feel22.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "iraq.feel22.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://iraq.feel22.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "dekurgroup.store",
+        "name_ar": "Dekur Group Store",
+        "source_kind": "retailer",
+        "trust_weight": 0.5,
+        "is_active": true,
+        "base_url": "https://dekurgroup.store",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "dekurgroup.store",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://dekurgroup.store",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "hazalgifts.com",
+        "name_ar": "Hazal Gifts",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://hazalgifts.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "hazalgifts.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://hazalgifts.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "simma.io",
+        "name_ar": "سِما",
+        "source_kind": "marketplace",
+        "trust_weight": 0.58,
+        "is_active": true,
+        "base_url": "https://www.simma.io",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "simma.io",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.simma.io",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "www.ubuy.iq",
+        "name_ar": "Ubuy العراق",
+        "source_kind": "marketplace",
+        "trust_weight": 0.52,
+        "is_active": true,
+        "base_url": "https://www.ubuy.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "www.ubuy.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.ubuy.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://www.ubuy.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "gigairaq.com",
+        "name_ar": "Giga Iraq",
+        "source_kind": "retailer",
+        "trust_weight": 0.55,
+        "is_active": true,
+        "base_url": "https://gigairaq.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "gigairaq.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://gigairaq.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://gigairaq.com/collections/all",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "jawharataliraq.com.iq",
+        "name_ar": "Jawharat Al-Iraq",
+        "source_kind": "retailer",
+        "trust_weight": 0.54,
+        "is_active": true,
+        "base_url": "https://jawharataliraq.com.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "jawharataliraq.com.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://jawharataliraq.com.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://jawharataliraq.com.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "gini.iq",
+        "name_ar": "جني (منصة متاجر)",
+        "source_kind": "official",
+        "trust_weight": 0.4,
+        "is_active": true,
+        "base_url": "https://gini.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "gini.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://gini.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://gini.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "moj.hostingcentar.com",
+        "name_ar": "Hosting Centar (خدمات)",
+        "source_kind": "official",
+        "trust_weight": 0.35,
+        "is_active": true,
+        "base_url": "https://moj.hostingcentar.com",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "moj.hostingcentar.com",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://moj.hostingcentar.com",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "ylctc.iq",
+        "name_ar": "YLCTC (خدمات مواقع)",
+        "source_kind": "official",
+        "trust_weight": 0.35,
+        "is_active": true,
+        "base_url": "https://ylctc.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "ylctc.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://ylctc.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://ylctc.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "epay.nahrainuniv.edu.iq",
+        "name_ar": "E-Pay جامعة النهرين",
+        "source_kind": "official",
+        "trust_weight": 0.3,
+        "is_active": true,
+        "base_url": "https://epay.nahrainuniv.edu.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "epay.nahrainuniv.edu.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://epay.nahrainuniv.edu.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://epay.nahrainuniv.edu.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "cc.uodiyala.edu.iq",
+        "name_ar": "مركز الحاسبة - ديالى",
+        "source_kind": "official",
+        "trust_weight": 0.3,
+        "is_active": true,
+        "base_url": "https://cc.uodiyala.edu.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "cc.uodiyala.edu.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://cc.uodiyala.edu.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://cc.uodiyala.edu.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "gwm.iq",
+        "name_ar": "GWM Iraq",
+        "source_kind": "official",
+        "trust_weight": 0.3,
+        "is_active": true,
+        "base_url": "https://www.gwm.iq",
+        "logo_url": null
+      },
+      "patterns": {
+        "domain": "gwm.iq",
+        "product_regex": "\\/(product|products|p|item|dp|shop|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|catalog|product-category)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.gwm.iq",
+          "page_type": "category",
+          "priority": 10,
+          "is_active": true
+        },
+        {
+          "url": "https://www.gwm.iq/shop",
+          "page_type": "category",
+          "priority": 30,
+          "is_active": true
+        }
+      ],
+      "adapters": [
+        {
+          "adapter_type": "jsonld",
+          "priority": 10,
+          "is_active": true,
+          "selectors": {
+            "productName": [
+              "jsonld.name",
+              "meta:og:title",
+              "meta:title"
+            ],
+            "description": [
+              "jsonld.description",
+              "meta:og:description",
+              "meta:description"
+            ],
+            "price": [
+              "jsonld.offers.price",
+              "jsonld.offers.lowPrice",
+              "meta:product:price:amount",
+              "meta:product:price"
+            ],
+            "currency": [
+              "jsonld.offers.priceCurrency",
+              "meta:product:price:currency"
+            ],
+            "image": [
+              "jsonld.image",
+              "meta:og:image"
+            ],
+            "inStock": [
+              "jsonld.offers.availability"
+            ]
+          }
+        }
+      ],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+  Shkad Aadel Design System
+  Iraq-focused fair-price intelligence
+  
+  Color philosophy:
+  - Teal/cyan primary: trust, clarity, data integrity
+  - Warm sand/amber accent: Iraqi desert warmth
+  - Deep navy background for dark mode: authority, professionalism
+  - Red destructive: price alerts, warnings
+  
+  Typography:
+  - Tajawal: Display/headings (Arabic-first, geometric, modern)
+  - IBM Plex Sans Arabic: Body (excellent readability, data-dense UI)
+  
+  All colors in HSL. RTL-first layout.
+*/
+
+@layer base {
+  :root {
+    /* Core surfaces */
+    --background: 40 20% 98%;
+    --foreground: 220 25% 12%;
+
+    --card: 40 15% 97%;
+    --card-foreground: 220 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 12%;
+
+    /* Brand: teal */
+    --primary: 185 72% 28%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: warm sand */
+    --secondary: 35 40% 92%;
+    --secondary-foreground: 30 30% 25%;
+
+    /* Muted */
+    --muted: 40 15% 94%;
+    --muted-foreground: 220 10% 46%;
+
+    /* Accent: amber gold */
+    --accent: 38 85% 55%;
+    --accent-foreground: 30 50% 12%;
+
+    /* Destructive: red for alerts */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success: green for verified prices */
+    --success: 152 60% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning: orange for moderate flags */
+    --warning: 25 90% 52%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Info: blue for neutral info */
+    --info: 210 70% 50%;
+    --info-foreground: 0 0% 100%;
+
+    /* Chrome */
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 185 72% 28%;
+    --radius: 0.625rem;
+
+    /* Sidebar */
+    --sidebar-background: 40 15% 96%;
+    --sidebar-foreground: 220 15% 30%;
+    --sidebar-primary: 185 72% 28%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 38 50% 90%;
+    --sidebar-accent-foreground: 30 30% 20%;
+    --sidebar-border: 220 15% 90%;
+    --sidebar-ring: 185 72% 40%;
+
+    /* Typography scale (rem) */
+    --font-display: 'Tajawal', sans-serif;
+    --font-body: 'IBM Plex Sans Arabic', sans-serif;
+
+    /* Spacing scale */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+    --space-3xl: 4rem;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(220 25% 12% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(220 25% 12% / 0.07), 0 2px 4px -2px hsl(220 25% 12% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(220 25% 12% / 0.08), 0 4px 6px -4px hsl(220 25% 12% / 0.04);
+    --shadow-glow: 0 0 20px -5px hsl(185 72% 28% / 0.25);
+  }
+
+  .dark {
+    --background: 220 30% 8%;
+    --foreground: 40 15% 95%;
+
+    --card: 220 25% 11%;
+    --card-foreground: 40 15% 95%;
+
+    --popover: 220 28% 10%;
+    --popover-foreground: 40 15% 95%;
+
+    --primary: 185 65% 45%;
+    --primary-foreground: 220 30% 5%;
+
+    --secondary: 220 20% 16%;
+    --secondary-foreground: 40 15% 85%;
+
+    --muted: 220 20% 16%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 38 80% 50%;
+    --accent-foreground: 30 50% 10%;
+
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 25 85% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 210 65% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 185 65% 45%;
+
+    --sidebar-background: 220 28% 10%;
+    --sidebar-foreground: 40 15% 90%;
+    --sidebar-primary: 185 65% 45%;
+    --sidebar-primary-foreground: 220 30% 5%;
+    --sidebar-accent: 220 20% 16%;
+    --sidebar-accent-foreground: 40 15% 85%;
+    --sidebar-border: 220 20% 16%;
+    --sidebar-ring: 185 65% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    direction: rtl;
+    font-family: var(--font-body);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "kern" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* RTL-aware focus ring */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring rounded-sm;
+  }
+
+  /* Typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  h1 { @apply text-4xl md:text-5xl; }
+  h2 { @apply text-3xl md:text-4xl; }
+  h3 { @apply text-2xl md:text-3xl; }
+  h4 { @apply text-xl md:text-2xl; }
+  h5 { @apply text-lg md:text-xl; }
+  h6 { @apply text-base md:text-lg; }
+
+  /* LTR override class */
+  [dir="ltr"], .ltr {
+    direction: ltr;
+  }
+}
+
+@layer utilities {
+  /* RTL-safe margin/padding aliases */
+  .ms-auto { margin-inline-start: auto; }
+  .me-auto { margin-inline-end: auto; }
+
+  /* Animate utility */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
