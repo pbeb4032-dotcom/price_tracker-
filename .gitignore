@@ -26,6 +26,20 @@ nginx/ssl/
 api/logs/
 performance-results-*.json
 
+# Local-only operational drafts kept out of the tracked repo
+/FINAL_PRODUCTION_CHECKLIST.md
+/MISSION_ACCOMPLISHED.md
+/MONITORING_ALERTS.md
+/MONITORING_SETUP.md
+/PRODUCTION_DEPLOYMENT.md
+/USER_GUIDE.md
+/backup.sh
+/deploy-production.sh
+/logrotate.conf
+/nginx.conf
+/price-tracker-iraq.service
+/api/temp_function.sql
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

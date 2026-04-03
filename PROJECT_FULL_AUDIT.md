@@ -599,39 +599,36 @@ Remaining warning cleanup status:
 
 ## Local-Only Artifact Review
 
-The remaining local-only files in the working tree are not all equal. They split into three groups.
+The remaining local-only files were reviewed and split into two final outcomes.
 
-### 1. Safe to publish now
+### 1. Published after cleanup
 
-These are real repo assets and either already tracked now or are low-risk candidates:
-
-- `README.md`
-- `.env.example`
-
-### 2. Real operational assets, but should be aligned before publishing
-
-These look like real deployment or ops materials, but they still need one cleanup pass so they match the canonical API-first env names and deployment story:
+These assets were aligned to the canonical API-first deployment story and are now fit to track in the repo:
 
 - `.github/workflows/ci-cd.yml`
+- `.env.production.example`
+- `.env.staging.example`
 - `docs/production-deployment-runbook.md`
 - `docs/production-operations-manual.md`
 - `monitoring/grafana/`
 - `scripts/deploy-production.sh`
 - `scripts/setup-production.sh`
 - `scripts/setup-staging.sh`
+- `scripts/performance-test.js`
 - `scripts/run-performance-benchmarks.ps1`
 - `scripts/run-performance-benchmarks.sh`
 - `scripts/test-notifications.sh`
 
-Main reasons they are on hold:
+What changed in that cleanup pass:
 
-- some still reference old names like `JWT_SECRET` or `VITE_API_URL`
-- some still describe alternate deployment paths instead of the canonical Compose path
-- some duplicate behavior that already exists in tracked Docker and monitoring files
+- old env drift like `JWT_SECRET` and stale `VITE_API_URL` guidance was removed
+- AWS and Railway deployment assumptions were dropped from the published docs and CI
+- setup scripts were changed from "generate competing config" to "operate the tracked config"
+- Grafana provisioning was normalized around the repo's real Prometheus jobs and API metrics
 
-### 3. Likely temporary or duplicate local artifacts
+### 2. Intentionally kept local-only
 
-These should usually stay local, be moved into `docs/` or `scripts/`, or be deleted after review instead of being published at the repo root:
+These artifacts are still better treated as private drafts, one-off notes, or machine-specific operational files:
 
 - `FINAL_PRODUCTION_CHECKLIST.md`
 - `MISSION_ACCOMPLISHED.md`
@@ -646,9 +643,14 @@ These should usually stay local, be moved into `docs/` or `scripts/`, or be dele
 - `price-tracker-iraq.service`
 - `api/temp_function.sql`
 
-Recommendation:
+These are now better understood as:
 
-- publish only files that match the canonical API-first runtime story
-- move long-lived operational docs under `docs/`
-- keep executable deployment tooling under `scripts/`
-- avoid publishing duplicate root-level notes and one-off handoff documents
+- duplicate root-level notes that would confuse the canonical docs story
+- host-specific operational files that should be reviewed separately before any publication
+- temporary handoff artifacts rather than durable repository assets
+
+Recommendation going forward:
+
+- keep long-lived operations documentation under `docs/`
+- keep executable tooling under `scripts/`
+- treat root-level operational notes as drafts until they earn a permanent tracked location
