@@ -40,9 +40,11 @@ import { extractProductFromHtml } from '../ingestion/productExtract';
 import { patchTaxonomyV2Schema } from '../jobs/patchTaxonomyV2Schema';
 import { patchPublicationGateSchema } from '../jobs/patchPublicationGateSchema';
 import { patchCanonicalIdentitySchema } from '../jobs/patchCanonicalIdentitySchema';
+import { patchCatalogTaxonomyGovernanceSchema } from '../jobs/patchCatalogTaxonomyGovernanceSchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
 import { backfillCanonicalIdentity } from '../jobs/backfillCanonicalIdentity';
+import { reclassifyCanonicalTaxonomyShadow } from '../jobs/reclassifyCanonicalTaxonomyShadow';
 import { normalizeSiteCategory, taxonomyKeyToCategoryAndSubcategory } from '../ingestion/taxonomyV2';
 import { patchAppSettingsSchemaJob } from '../jobs/patchAppSettingsSchema';
 import { autoDiscoveryDaily } from '../jobs/autoDiscoveryDaily';
@@ -1756,6 +1758,64 @@ adminRoutes.post('/jobs/backfill_canonical_identity', async (c) => {
     offset: (body as any).offset,
   });
   return c.json(result);
+});
+
+adminRoutes.post('/jobs/patch_catalog_taxonomy_governance_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchCatalogTaxonomyGovernanceSchema(c.env);
+  return c.json(result);
+});
+
+adminRoutes.post('/jobs/reclassify_canonical_taxonomy_shadow', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const body = await c.req.json().catch(() => ({}));
+  const result = await reclassifyCanonicalTaxonomyShadow(c.env, {
+    limit: (body as any).limit,
+    offset: (body as any).offset,
+    applyApproved: Boolean((body as any).applyApproved ?? (body as any).apply_approved ?? false),
+  });
+  return c.json(result);
+});
+
+adminRoutes.get('/catalog_taxonomy/quarantine', async (c) => {
+  const gate = await requireAdmin(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const status = String(c.req.query('status') ?? 'pending');
+  const limit = Math.max(1, Math.min(200, Number(c.req.query('limit') ?? 50)));
+  const where = status === 'all' ? sql`` : sql`where q.status = ${status}`;
+
+  const rows = await gate.db.execute(sql`
+    select
+      q.id,
+      q.status,
+      q.variant_id,
+      q.family_id,
+      q.legacy_product_id,
+      q.source_domain,
+      q.source_url,
+      q.product_name,
+      q.current_taxonomy_key,
+      q.inferred_taxonomy_key,
+      q.inferred_category,
+      q.inferred_subcategory,
+      q.confidence,
+      q.margin,
+      q.review_priority,
+      q.deny_rules,
+      q.conflict,
+      q.conflict_reasons,
+      q.reviewer_note,
+      q.reviewed_at,
+      q.created_at
+    from public.catalog_taxonomy_quarantine q
+    ${where}
+    order by q.review_priority asc, q.created_at desc
+    limit ${limit}
+  `).catch(() => ({ rows: [] as any[] }));
+
+  return c.json({ ok: true, items: rows.rows ?? [] });
 });
 
 // Maintenance: roll up historical observations + delete old raw rows safely (batch + cursor)

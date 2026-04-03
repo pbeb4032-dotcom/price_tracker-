@@ -15,6 +15,7 @@ import { patchTaxonomyOverridesSchema } from './jobs/patchTaxonomyOverridesSchem
 import { patchTaxonomyV2Schema } from './jobs/patchTaxonomyV2Schema';
 import { patchPublicationGateSchema } from './jobs/patchPublicationGateSchema';
 import { patchCanonicalIdentitySchema } from './jobs/patchCanonicalIdentitySchema';
+import { patchCatalogTaxonomyGovernanceSchema } from './jobs/patchCatalogTaxonomyGovernanceSchema';
 import { seedTaxonomyV2 } from './jobs/seedTaxonomyV2';
 import { validateCandidateSources } from './jobs/validateCandidateSources';
 import { activateCandidateSources } from './jobs/activateCandidateSources';
@@ -123,6 +124,16 @@ async function main() {
     logger.info('Canonical identity schema patched successfully');
   } catch (e: any) {
     logger.warn('patchCanonicalIdentitySchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
+  }
+
+  try {
+    await patchCatalogTaxonomyGovernanceSchema(env as any);
+    logger.info('Catalog taxonomy governance schema patched successfully');
+  } catch (e: any) {
+    logger.warn('patchCatalogTaxonomyGovernanceSchema failed', {
       error: e?.message ?? e,
       stack: e?.stack,
     });
@@ -522,6 +533,10 @@ await db.execute(sql`
     await patchCanonicalIdentitySchema(env as any);
   });
 
+  void safeRun('patch_catalog_taxonomy_governance_schema', async () => {
+    await patchCatalogTaxonomyGovernanceSchema(env as any);
+  });
+
   void safeRun('seed_taxonomy_v2', async () => {
     await seedTaxonomyV2(env as any);
   });
@@ -631,6 +646,10 @@ await db.execute(sql`
 
   void safeRun('patch_canonical_identity_schema', async () => {
     await patchCanonicalIdentitySchema(env as any);
+  });
+
+  void safeRun('patch_catalog_taxonomy_governance_schema', async () => {
+    await patchCatalogTaxonomyGovernanceSchema(env as any);
   });
 
   void safeRun('seed_taxonomy_v2', async () => {

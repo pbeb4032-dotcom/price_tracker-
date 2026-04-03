@@ -3,13 +3,14 @@ import { getDb, type Env } from '../db';
 import { extractNumberLike, isSaneIqdPrice, normalizeToIqdSmart, validateImageUrl } from '../ingestion/sanity';
 import { assessAndMaybeQuarantinePrice, enqueuePriceAnomalyQuarantine } from '../ingestion/priceAnomalyQuarantine';
 import { inferCategoryKey } from '../ingestion/categoryInfer';
-import { inferTaxonomySuggestion } from '../ingestion/taxonomyV2';
+import { taxonomyKeyToCategoryAndSubcategory } from '../ingestion/taxonomyV2';
 import {
   assessPublicationGate,
   markPublicationOutcome,
   recordPublicationGateArtifacts,
   resolveLegacyCatalogMatch,
 } from '../ingestion/publicationGate';
+import { classifyGovernedTaxonomy } from '../catalog/taxonomyGovernance';
 
 const DEFAULT_FALLBACK_FX = 1470;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -184,12 +185,20 @@ async function upsertApiProduct(
   p: ExtractedApiProduct,
   args: { domain: string; sourceId: string; merchantName: string; trustWeight: number; regionId: string; fxRate: number },
 ): Promise<boolean> {
-  // Normalize price
+  // Preserve the legacy category hint for compatibility with downstream price logic,
+  // but let governed taxonomy decide the publishable taxonomy/category truth.
   const inferredCategory = inferCategoryKey({
     name: p?.name ?? null,
     description: p?.description ?? null,
     domain: args.domain,
     url: p?.sourceUrl ?? null,
+  });
+  const governed = classifyGovernedTaxonomy({
+    name: p.name,
+    description: p.description ?? null,
+    domain: args.domain,
+    url: p.sourceUrl,
+    fallbackCategory: inferredCategory,
   });
 
   const { priceIqd, normalizationFactor, parsedCurrency } = normalizeToIqdSmart(
@@ -215,14 +224,13 @@ async function upsertApiProduct(
     return false;
   }
 
-  const taxonomySuggestion = inferTaxonomySuggestion({
-    category: inferredCategory,
-    subcategory: null,
-    name: p.name,
-    description: p.description ?? null,
-    siteCategoryRaw: null,
-    siteCategoryKey: 'general',
-  });
+  const taxonomySuggestion = {
+    taxonomyKey: governed.taxonomyKey,
+    confidence: governed.confidence,
+    reason: governed.reasons.join(' | '),
+    conflict: governed.conflict,
+    conflictReason: governed.conflictReasons.join(' | ') || null,
+  };
   const priceConfidence = 0.85;
 
   const legacyMatch = await resolveLegacyCatalogMatch(db, {
@@ -263,12 +271,14 @@ async function upsertApiProduct(
         currency: p.currency ?? null,
         image: p.image ?? null,
         in_stock: p.inStock,
+        governed_taxonomy: governed,
         taxonomy_suggestion: taxonomySuggestion,
       },
       productName: p.name,
-      categoryHint: inferredCategory,
+      categoryHint: governed.category,
+      subcategoryHint: governed.subcategory,
       taxonomyHint: taxonomySuggestion.taxonomyKey,
-      categoryConflict: false,
+      categoryConflict: governed.conflict,
       taxonomyConflict: Boolean(taxonomySuggestion.conflict),
       match: legacyMatch,
       decision: gateDecision,
@@ -294,6 +304,54 @@ async function upsertApiProduct(
       error: 'product_upsert_failed',
     });
     return false;
+  }
+
+  try {
+    if (taxonomySuggestion.taxonomyKey) {
+      const mapped = taxonomyKeyToCategoryAndSubcategory(taxonomySuggestion.taxonomyKey);
+      await db.execute(sql`
+        update public.products
+        set
+          taxonomy_key = case when coalesce(taxonomy_manual,false)=true then taxonomy_key else ${taxonomySuggestion.taxonomyKey} end,
+          taxonomy_confidence = case when coalesce(taxonomy_manual,false)=true then taxonomy_confidence else ${taxonomySuggestion.confidence} end,
+          taxonomy_reason = case when coalesce(taxonomy_manual,false)=true then taxonomy_reason else ${taxonomySuggestion.reason} end,
+          category = case when coalesce(category_manual,false)=true then category else ${mapped.category} end,
+          subcategory = case when coalesce(subcategory_manual,false)=true then subcategory else ${mapped.subcategory} end,
+          updated_at = now()
+        where id = ${productId}::uuid
+      `).catch(() => {});
+
+      const needQuarantine = Boolean(taxonomySuggestion.conflict) || taxonomySuggestion.confidence < 0.85;
+      if (needQuarantine) {
+        await db.execute(sql`
+          insert into public.taxonomy_quarantine (
+            product_id, domain, url, product_name,
+            site_category_raw, site_category_norm,
+            current_taxonomy_key, inferred_taxonomy_key,
+            confidence, reason,
+            conflict, conflict_reason,
+            status
+          ) values (
+            ${productId}::uuid,
+            ${args.domain},
+            ${p.sourceUrl},
+            ${p.name},
+            null,
+            null,
+            null,
+            ${taxonomySuggestion.taxonomyKey},
+            ${taxonomySuggestion.confidence},
+            ${taxonomySuggestion.reason},
+            ${Boolean(taxonomySuggestion.conflict)},
+            ${taxonomySuggestion.conflictReason},
+            'pending'
+          )
+          on conflict (product_id, status) do nothing
+        `).catch(() => {});
+      }
+    }
+  } catch {
+    // ignore taxonomy updates on older DBs
   }
 
   // Duplicate daily check

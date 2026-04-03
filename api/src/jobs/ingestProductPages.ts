@@ -4,7 +4,6 @@ import { extractProductFromHtml } from '../ingestion/productExtract';
 import { isSaneIqdPrice, normalizeToIqdSmart, validateImageUrl as validateImageUrlShared } from '../ingestion/sanity';
 import { assessAndMaybeQuarantinePrice, enqueuePriceAnomalyQuarantine } from '../ingestion/priceAnomalyQuarantine';
 import { inferCategoryKeyDetailed, type CategoryKey } from '../ingestion/categoryInfer';
-import { classifyGrocerySubcategory } from '../ingestion/groceryTaxonomy';
 import { inferTaxonomySuggestion, normalizeSiteCategory, taxonomyKeyToCategoryAndSubcategory } from '../ingestion/taxonomyV2';
 import { loadCategoryOverrides, matchCategoryOverride, type CategoryOverrideRow } from '../ingestion/categoryOverrides';
 import {
@@ -13,6 +12,10 @@ import {
   recordPublicationGateArtifacts,
   resolveLegacyCatalogMatch,
 } from '../ingestion/publicationGate';
+import {
+  classifyGovernedTaxonomy,
+  resolveMappedTaxonomyKey,
+} from '../catalog/taxonomyGovernance';
 import { computeRenderPriority } from '../lib/renderPriority';
 
 const BATCH_SIZE = 25;
@@ -698,7 +701,8 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         return;
       }
 
-      // Category hint (3-pass): product text + siteCategory (if present) + specialized-domain hints.
+      // Keep legacy category detail for backward-safe product upgrade behavior,
+      // but drive taxonomy truth from the governed taxonomy service.
       const catDet = inferCategoryKeyDetailed({
         name: extracted.name ?? null,
         description: extracted.description ?? null,
@@ -706,59 +710,54 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         url,
         siteCategory: (extracted as any).siteCategory ?? null,
       });
-      const catHint = catDet.category;
       (extracted as any).__catDet = catDet;
+      const siteCategoryRaw = (extracted as any).siteCategory ?? null;
+      const siteNorm = normalizeSiteCategory(siteCategoryRaw);
+      const mappedTaxonomyKey = await resolveMappedTaxonomyKey(db, sourceDomain, siteCategoryRaw);
+      const governed = classifyGovernedTaxonomy({
+        name: extracted.name ?? null,
+        description: extracted.description ?? null,
+        domain: sourceDomain,
+        url,
+        siteCategoryRaw,
+        mappedTaxonomyKey,
+      });
 
-      const nonGeneralSignals = [catDet.category, catDet.site, catDet.domain].filter((x) => x && x !== 'general');
-      const counts = new Map<string, number>();
-      for (const s of nonGeneralSignals) counts.set(s, (counts.get(s) ?? 0) + 1);
-      const maxVote = Math.max(0, ...Array.from(counts.values()));
-      const categoryConflict = nonGeneralSignals.length >= 2 && maxVote < 2;
-
-      const categoryBadge = ((): 'trusted' | 'medium' | 'weak' => {
-        if (catHint === 'general') return 'weak';
-        if (maxVote >= 2) return 'trusted';
-        if (catDet.textScore >= 3) return 'trusted';
-        if (catDet.textScore >= 2) return 'medium';
-        if (catDet.site !== 'general' && catDet.category === catDet.site) return 'medium';
-        if (catDet.domain !== 'general' && catDet.category === catDet.domain) return 'medium';
-        return 'weak';
-      })();
-
-      const categoryConfidence = ((): number => {
-        if (categoryBadge === 'trusted') return 0.85;
-        if (categoryBadge === 'medium') return 0.65;
-        return 0.45;
-      })();
+      let decidedCategory = governed.category;
+      let decidedSubcategory: string | null = governed.subcategory;
+      let categoryBadgeFinal: 'trusted' | 'medium' | 'weak' = governed.badge;
+      let categoryConfidenceFinal: number = governed.confidence;
+      let categoryConflictFinal: boolean = governed.conflict;
+      let subBadge: string = governed.subcategory ? governed.badge : 'weak';
+      let subConfidence: number = governed.subcategory ? governed.confidence : 0.3;
 
       const categoryEvidence = {
-        decided: catHint,
+        decided: governed.category,
+        taxonomyKey: governed.taxonomyKey,
         textScore: catDet.textScore,
         site: catDet.site,
         domain: catDet.domain,
-        siteCategoryRaw: (extracted as any).siteCategory ?? null,
-        conflict: categoryConflict,
+        siteCategoryRaw,
+        conflict: governed.conflict,
+        conflictReasons: governed.conflictReasons,
+        denyRules: governed.denyRules,
+        reasons: governed.reasons,
+        governed: governed.evidence,
       };
-
-      // Final category meta (may be overridden by admin rules)
-      let categoryBadgeFinal: 'trusted' | 'medium' | 'weak' = categoryBadge;
-      let categoryConfidenceFinal: number = categoryConfidence;
-      let categoryConflictFinal: boolean = categoryConflict;
-
-      // Grocery taxonomy (subcategory)
-      const subDet = catHint === 'groceries'
-        ? classifyGrocerySubcategory({
-            name: extracted.name ?? null,
-            description: extracted.description ?? null,
-            siteCategory: (extracted as any).siteCategory ?? null,
-          })
-        : { subcategory: null, badge: 'weak' as const, confidence: 0.3, reasons: ['not_groceries'] };
-
-      let decidedCategory = catHint;
-      let decidedSubcategory: string | null = subDet.subcategory;
-      let subBadge: string = subDet.badge;
-      let subConfidence: number = subDet.confidence;
-      const subEvidence = { decided: subDet.subcategory, badge: subDet.badge, confidence: subDet.confidence, reasons: subDet.reasons };
+      const subEvidence = {
+        decided: governed.subcategory,
+        badge: subBadge,
+        confidence: subConfidence,
+        reasons: governed.reasons,
+        forcedByRule: governed.forcedByRule,
+      };
+      let sug = {
+        taxonomyKey: governed.taxonomyKey,
+        confidence: governed.confidence,
+        reason: governed.reasons.join(' | '),
+        conflict: governed.conflict,
+        conflictReason: governed.conflictReasons.join(' | ') || null,
+      };
 
       // Admin overrides (category/subcategory force) — priority over inference
       const matchedOverride = matchCategoryOverride(overrides, {
@@ -788,6 +787,28 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         subConfidence = 0.99;
       }
 
+      if (matchedOverride?.category || matchedOverride?.subcategory) {
+        const overrideSuggestion = inferTaxonomySuggestion({
+          mappedTaxonomyKey: null,
+          category: decidedCategory,
+          subcategory: decidedSubcategory,
+          name: extracted.name ?? null,
+          description: extracted.description ?? null,
+          siteCategoryRaw,
+          siteCategoryKey: (catDet as any)?.site ?? 'general',
+        });
+        sug = {
+          taxonomyKey: overrideSuggestion.taxonomyKey,
+          confidence: 0.99,
+          reason: `admin_override:${matchedOverride?.id ?? 'rule'}`,
+          conflict: false,
+          conflictReason: null,
+        };
+        if (!decidedSubcategory && overrideSuggestion.taxonomyKey) {
+          decidedSubcategory = taxonomyKeyToCategoryAndSubcategory(overrideSuggestion.taxonomyKey).subcategory;
+        }
+      }
+
       (categoryEvidence as any).override = matchedOverride ? {
         id: matchedOverride.id,
         match_kind: matchedOverride.match_kind,
@@ -795,6 +816,11 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         category: matchedOverride.category,
         subcategory: matchedOverride.subcategory,
       } : null;
+      (categoryEvidence as any).final = {
+        category: decidedCategory,
+        subcategory: decidedSubcategory,
+        taxonomyKey: sug.taxonomyKey,
+      };
 
       const { priceIqd, normalizationFactor, parsedCurrency } = normalizeToIqdSmart(
         Number(extracted.price),
@@ -845,33 +871,6 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         failed++;
         return;
       }
-
-      const siteCategoryRaw = (categoryEvidence as any)?.siteCategoryRaw ?? null;
-      const siteNorm = normalizeSiteCategory(siteCategoryRaw);
-      let mappedTaxonomyKey: string | null = null;
-      if (siteNorm) {
-        try {
-          const mr = await db.execute(sql`
-            select taxonomy_key
-            from public.domain_taxonomy_mappings
-            where domain = ${sourceDomain} and site_category_norm = ${siteNorm} and is_active = true
-            limit 1
-          `);
-          mappedTaxonomyKey = (mr.rows as any[])[0]?.taxonomy_key ?? null;
-        } catch {
-          mappedTaxonomyKey = null;
-        }
-      }
-
-      const sug = inferTaxonomySuggestion({
-        mappedTaxonomyKey,
-        category: decidedCategory,
-        subcategory: decidedSubcategory,
-        name: extracted.name ?? null,
-        description: extracted.description ?? null,
-        siteCategoryRaw,
-        siteCategoryKey: (catDet as any)?.site ?? 'general',
-      });
 
       const priceConfidenceBase = methodToConfidence(extracted.evidenceType);
       const evidenceType: EvidenceType = 'url';
@@ -930,6 +929,7 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
             site_category: siteCategoryRaw,
             category_evidence: categoryEvidence,
             subcategory_evidence: subEvidence,
+            governed_taxonomy: governed,
             taxonomy_suggestion: sug,
           },
           productName: String(extracted.name ?? ''),
