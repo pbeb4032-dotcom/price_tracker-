@@ -3,6 +3,13 @@ import { getDb, type Env } from '../db';
 import { extractNumberLike, isSaneIqdPrice, normalizeToIqdSmart, validateImageUrl } from '../ingestion/sanity';
 import { assessAndMaybeQuarantinePrice, enqueuePriceAnomalyQuarantine } from '../ingestion/priceAnomalyQuarantine';
 import { inferCategoryKey } from '../ingestion/categoryInfer';
+import { inferTaxonomySuggestion } from '../ingestion/taxonomyV2';
+import {
+  assessPublicationGate,
+  markPublicationOutcome,
+  recordPublicationGateArtifacts,
+  resolveLegacyCatalogMatch,
+} from '../ingestion/publicationGate';
 
 const DEFAULT_FALLBACK_FX = 1470;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -208,10 +215,86 @@ async function upsertApiProduct(
     return false;
   }
 
-  // Product by source URL map
-  const productId = await upsertProduct(db, args.sourceId, args.domain, p.sourceUrl, p);
+  const taxonomySuggestion = inferTaxonomySuggestion({
+    category: inferredCategory,
+    subcategory: null,
+    name: p.name,
+    description: p.description ?? null,
+    siteCategoryRaw: null,
+    siteCategoryKey: 'general',
+  });
+  const priceConfidence = 0.85;
 
-  if (!productId) return false;
+  const legacyMatch = await resolveLegacyCatalogMatch(db, {
+    sourceId: args.sourceId,
+    sourceDomain: args.domain,
+    sourceUrl: p.sourceUrl,
+    name: p.name,
+  });
+
+  const gateDecision = assessPublicationGate({
+    match: legacyMatch,
+    taxonomyConfidence: taxonomySuggestion.confidence,
+    priceConfidence,
+    categoryConflict: false,
+    taxonomyConflict: Boolean(taxonomySuggestion.conflict),
+  });
+
+  let gateRecord: { documentId: string; candidateId: string };
+  try {
+    gateRecord = await recordPublicationGateArtifacts(db, {
+      sourceId: args.sourceId,
+      sourceDomain: args.domain,
+      sourceKind: 'api',
+      pageType: 'product',
+      sourceUrl: p.sourceUrl,
+      canonicalUrl: p.sourceUrl,
+      payloadKind: 'json',
+      rawPayload: {
+        source: 'discoverProductApis',
+        merchant_name: args.merchantName,
+        trust_weight: args.trustWeight,
+      },
+      extractedPayload: {
+        name: p.name,
+        description: p.description ?? null,
+        price: p.price,
+        price_text: p.priceText ?? null,
+        currency: p.currency ?? null,
+        image: p.image ?? null,
+        in_stock: p.inStock,
+        taxonomy_suggestion: taxonomySuggestion,
+      },
+      productName: p.name,
+      categoryHint: inferredCategory,
+      taxonomyHint: taxonomySuggestion.taxonomyKey,
+      categoryConflict: false,
+      taxonomyConflict: Boolean(taxonomySuggestion.conflict),
+      match: legacyMatch,
+      decision: gateDecision,
+    });
+  } catch {
+    return false;
+  }
+
+  if (!gateDecision.publishable) {
+    return false;
+  }
+
+  // Product by trusted legacy mapping only when the gate allows publication.
+  const productId = await upsertProduct(db, args.sourceId, args.domain, p.sourceUrl, p, {
+    existingProductId: legacyMatch.productId,
+    allowCreate: false,
+  });
+
+  if (!productId) {
+    await markPublicationOutcome(db, {
+      candidateId: gateRecord.candidateId,
+      status: 'failed',
+      error: 'product_upsert_failed',
+    });
+    return false;
+  }
 
   // Duplicate daily check
   const today = new Date().toISOString().slice(0, 10);
@@ -228,7 +311,14 @@ async function upsertApiProduct(
     anomalyReason: 'api_ingest_price_anomaly',
     anomalyContext: { stage: 'discoverProductApis' },
   });
-  if (quarantineCheck.quarantined) return true;
+  if (quarantineCheck.quarantined) {
+    await markPublicationOutcome(db, {
+      candidateId: gateRecord.candidateId,
+      legacyProductId: productId,
+      status: 'published',
+    });
+    return false;
+  }
 
   const existing = await db.execute(sql`
     select id
@@ -299,26 +389,55 @@ async function upsertApiProduct(
     `).catch(() => {});
   }
 
+  await markPublicationOutcome(db, {
+    candidateId: gateRecord.candidateId,
+    legacyProductId: productId,
+    status: 'published',
+  });
+
   return true;
 }
 
-async function upsertProduct(db: any, sourceId: string, sourceDomain: string, url: string, p: ExtractedApiProduct): Promise<string | null> {
+async function upsertProduct(
+  db: any,
+  sourceId: string,
+  sourceDomain: string,
+  url: string,
+  p: ExtractedApiProduct,
+  opts?: { existingProductId?: string | null; allowCreate?: boolean },
+): Promise<string | null> {
+  const forcedProductId = opts?.existingProductId ? String(opts.existingProductId) : null;
   const inferredCategory = inferCategoryKey({
     name: p?.name ?? null,
     description: p?.description ?? null,
     domain: sourceDomain,
     url,
   });
-  const mapped = await db.execute(sql`
-    select product_id
-    from public.product_url_map
-    where url_hash = md5(lower(${url}))
-      and source_id = ${sourceId}::uuid
-    limit 1
-  `).catch(() => ({ rows: [] as any[] }));
+  const mapped = forcedProductId
+    ? { rows: [{ product_id: forcedProductId }] as any[] }
+    : await db.execute(sql`
+        select product_id
+        from public.product_url_map
+        where url_hash = md5(lower(${url}))
+          and source_id = ${sourceId}::uuid
+        limit 1
+      `).catch(() => ({ rows: [] as any[] }));
 
   const mappedId = (mapped.rows as any[])[0]?.product_id as string | undefined;
-  if (mappedId) return mappedId;
+  if (mappedId) {
+    if (forcedProductId) {
+      await db.execute(sql`
+        insert into public.product_url_map (source_id, url, canonical_url, product_id, status, last_seen_at)
+        values (${sourceId}::uuid, ${url}, null, ${mappedId}::uuid, 'mapped', now())
+        on conflict (source_id, url_hash) do update set
+          product_id = excluded.product_id,
+          status = 'mapped',
+          last_seen_at = now(),
+          updated_at = now()
+      `).catch(() => {});
+    }
+    return mappedId;
+  }
 
   const byName = await db.execute(sql`
     select id
@@ -329,6 +448,7 @@ async function upsertProduct(db: any, sourceId: string, sourceDomain: string, ur
 
   let productId = (byName.rows as any[])[0]?.id as string | undefined;
   if (!productId) {
+    if (opts?.allowCreate === false) return null;
     const created = await db.execute(sql`
       insert into public.products (name_ar, category, unit, description_ar, image_url, is_active)
       values (${p.name}, ${inferredCategory}, 'pcs', ${p.description ?? null}, ${p.image ?? null}, true)

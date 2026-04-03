@@ -7,6 +7,12 @@ import { inferCategoryKeyDetailed, type CategoryKey } from '../ingestion/categor
 import { classifyGrocerySubcategory } from '../ingestion/groceryTaxonomy';
 import { inferTaxonomySuggestion, normalizeSiteCategory, taxonomyKeyToCategoryAndSubcategory } from '../ingestion/taxonomyV2';
 import { loadCategoryOverrides, matchCategoryOverride, type CategoryOverrideRow } from '../ingestion/categoryOverrides';
+import {
+  assessPublicationGate,
+  markPublicationOutcome,
+  recordPublicationGateArtifacts,
+  resolveLegacyCatalogMatch,
+} from '../ingestion/publicationGate';
 import { computeRenderPriority } from '../lib/renderPriority';
 
 const BATCH_SIZE = 25;
@@ -840,6 +846,120 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         return;
       }
 
+      const siteCategoryRaw = (categoryEvidence as any)?.siteCategoryRaw ?? null;
+      const siteNorm = normalizeSiteCategory(siteCategoryRaw);
+      let mappedTaxonomyKey: string | null = null;
+      if (siteNorm) {
+        try {
+          const mr = await db.execute(sql`
+            select taxonomy_key
+            from public.domain_taxonomy_mappings
+            where domain = ${sourceDomain} and site_category_norm = ${siteNorm} and is_active = true
+            limit 1
+          `);
+          mappedTaxonomyKey = (mr.rows as any[])[0]?.taxonomy_key ?? null;
+        } catch {
+          mappedTaxonomyKey = null;
+        }
+      }
+
+      const sug = inferTaxonomySuggestion({
+        mappedTaxonomyKey,
+        category: decidedCategory,
+        subcategory: decidedSubcategory,
+        name: extracted.name ?? null,
+        description: extracted.description ?? null,
+        siteCategoryRaw,
+        siteCategoryKey: (catDet as any)?.site ?? 'general',
+      });
+
+      const priceConfidenceBase = methodToConfidence(extracted.evidenceType);
+      const evidenceType: EvidenceType = 'url';
+      const evidenceRef = extracted.evidenceType;
+      const priceConfidence = Math.min(1, priceConfidenceBase - (parsedCurrency !== 'IQD' ? 0.05 : 0));
+
+      const legacyMatch = await resolveLegacyCatalogMatch(db, {
+        sourceId: String(source.id),
+        sourceDomain,
+        sourceUrl: url,
+        name: extracted.name ?? null,
+      });
+
+      const gateDecision = assessPublicationGate({
+        match: legacyMatch,
+        taxonomyConfidence: sug.confidence,
+        priceConfidence,
+        categoryConflict: categoryConflictFinal,
+        taxonomyConflict: Boolean(sug.conflict),
+      });
+
+      let gateRecord: { documentId: string; candidateId: string };
+      try {
+        gateRecord = await recordPublicationGateArtifacts(db, {
+          ingestRunId: runId,
+          sourceId: String(source.id),
+          sourceDomain,
+          sourceKind: 'html',
+          pageType: String(item.page_type ?? 'product'),
+          sourceUrl: url,
+          canonicalUrl: extracted.canonicalUrl ?? null,
+          httpStatus: fetchResult.status ?? null,
+          contentType: fetchResult.contentType ?? null,
+          payloadKind: 'html',
+          rawPayload: {
+            fetch: {
+              status: fetchResult.status ?? null,
+              contentType: fetchResult.contentType ?? null,
+              blocked: fetchResult.blocked ?? false,
+              blockedReason: fetchResult.blockedReason ?? null,
+              renderedBy: fetchResult.renderedBy ?? 'http',
+              fetchMs,
+            },
+            html_excerpt: String(fetchResult.html ?? '').slice(0, 1800),
+            html_length: String(fetchResult.html ?? '').length,
+          },
+          extractedPayload: {
+            name: extracted.name ?? null,
+            description: extracted.description ?? null,
+            price: extracted.price ?? null,
+            price_text: (extracted as any).priceText ?? null,
+            currency: extracted.currency ?? null,
+            image: extracted.image ?? null,
+            in_stock: extracted.inStock ?? true,
+            evidence_type: extracted.evidenceType ?? null,
+            site_category: siteCategoryRaw,
+            category_evidence: categoryEvidence,
+            subcategory_evidence: subEvidence,
+            taxonomy_suggestion: sug,
+          },
+          productName: String(extracted.name ?? ''),
+          categoryHint: decidedCategory,
+          subcategoryHint: decidedSubcategory,
+          taxonomyHint: sug.taxonomyKey,
+          categoryConflict: categoryConflictFinal,
+          taxonomyConflict: Boolean(sug.conflict),
+          match: legacyMatch,
+          decision: gateDecision,
+        });
+      } catch (e: any) {
+        await logError(item.id, sourceDomain, url, 'UNKNOWN', fetchResult.status, null, `publication gate record failed: ${String(e?.message ?? e).slice(0, 200)}`);
+        await markRetry(db, item.id, 'publication gate record failed', fetchResult, fetchMs, 'UNKNOWN');
+        failed++;
+        return;
+      }
+
+      if (!gateDecision.publishable) {
+        await markDone(
+          db,
+          item.id,
+          fetchResult,
+          fetchMs,
+          `quarantined:${gateDecision.reasons.join(',') || 'publication_gate'}`,
+        );
+        succeeded++;
+        return;
+      }
+
       const productId = await upsertProduct(db, sourceDomain, url, extracted, {
         category: decidedCategory,
         subcategory: decidedSubcategory,
@@ -847,8 +967,15 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         lockSubcategory,
         overrideCategoryId,
         overrideSubcategoryId,
+        existingProductId: legacyMatch.productId,
+        allowCreate: false,
       });
       if (!productId) {
+        await markPublicationOutcome(db, {
+          candidateId: gateRecord.candidateId,
+          status: 'failed',
+          error: 'product_upsert_failed',
+        });
         await logError(item.id, sourceDomain, url, 'PRODUCT_UPSERT_FAILED', fetchResult.status, null, 'product upsert failed');
         await markRetry(db, item.id, 'product upsert failed', fetchResult, fetchMs, 'PRODUCT_UPSERT_FAILED');
         failed++;
@@ -858,33 +985,6 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
       // ✅ Taxonomy v2 (hierarchical): infer key + (optional) quarantine when uncertain.
       // Safe: if schema isn't patched yet, this will be ignored.
       try {
-        const siteCategoryRaw = (categoryEvidence as any)?.siteCategoryRaw ?? null;
-        const siteNorm = normalizeSiteCategory(siteCategoryRaw);
-        let mappedTaxonomyKey: string | null = null;
-        if (siteNorm) {
-          try {
-            const mr = await db.execute(sql`
-              select taxonomy_key
-              from public.domain_taxonomy_mappings
-              where domain = ${sourceDomain} and site_category_norm = ${siteNorm} and is_active = true
-              limit 1
-            `);
-            mappedTaxonomyKey = (mr.rows as any[])[0]?.taxonomy_key ?? null;
-          } catch {
-            mappedTaxonomyKey = null;
-          }
-        }
-
-        const sug = inferTaxonomySuggestion({
-          mappedTaxonomyKey,
-          category: decidedCategory,
-          subcategory: decidedSubcategory,
-          name: extracted.name ?? null,
-          description: extracted.description ?? null,
-          siteCategoryRaw,
-          siteCategoryKey: (catDet as any)?.site ?? 'general',
-        });
-
         if (sug.taxonomyKey) {
           const mapped = taxonomyKeyToCategoryAndSubcategory(sug.taxonomyKey);
 
@@ -985,6 +1085,11 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
           anomalyContext: { stage: 'ingestProductPages', frontier_id: item.id },
         });
         if (quarantineCheck.quarantined) {
+          await markPublicationOutcome(db, {
+            candidateId: gateRecord.candidateId,
+            legacyProductId: productId,
+            status: 'published',
+          });
           await markDone(db, item.id, fetchResult, fetchMs, `quarantined:${quarantineCheck.reasons[0]}`);
           succeeded++;
           return;
@@ -992,10 +1097,6 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
 
         const isPriceAnomaly = Boolean(lowPriceCategoryAnomaly);
         const anomalyReason = isPriceAnomaly ? 'too_low_for_category' : null;
-        const priceConfidenceBase = methodToConfidence(extracted.evidenceType);
-        const evidenceType: EvidenceType = 'url';
-        const evidenceRef = extracted.evidenceType;
-        const priceConfidence = Math.min(1, priceConfidenceBase - (parsedCurrency !== 'IQD' ? 0.05 : 0));
 
         const autoVerified =
           !isPriceAnomaly &&
@@ -1124,6 +1225,11 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
       }
 
       await markDone(db, item.id, fetchResult, fetchMs, extracted.canonicalUrl ?? null);
+      await markPublicationOutcome(db, {
+        candidateId: gateRecord.candidateId,
+        legacyProductId: productId,
+        status: 'published',
+      });
       succeeded++;
 
     };
@@ -1176,6 +1282,8 @@ async function upsertProduct(
     lockSubcategory?: boolean;
     overrideCategoryId?: string | null;
     overrideSubcategoryId?: string | null;
+    existingProductId?: string | null;
+    allowCreate?: boolean;
   },
 ): Promise<string | null> {
   const det = (extracted as any)?.__catDet ?? inferCategoryKeyDetailed({
@@ -1208,6 +1316,8 @@ async function upsertProduct(
   const lockSubcategory = Boolean(decision?.lockSubcategory ?? false);
   const overrideCategoryId = decision?.overrideCategoryId ? String(decision.overrideCategoryId) : null;
   const overrideSubcategoryId = decision?.overrideSubcategoryId ? String(decision.overrideSubcategoryId) : null;
+  const forcedProductId = decision?.existingProductId ? String(decision.existingProductId) : null;
+  const allowCreate = decision?.allowCreate !== false;
 
   const src = await db.execute(sql`
     select id from public.price_sources where domain = ${sourceDomain} limit 1
@@ -1215,13 +1325,15 @@ async function upsertProduct(
   const sourceId = (src.rows as any[])[0]?.id as string | undefined;
 
   // URL map first
-  const mapped = await db.execute(sql`
-    select product_id
-    from public.product_url_map
-    where url_hash = md5(lower(${url}))
-      ${sourceId ? sql`and source_id = ${sourceId}::uuid` : sql``}
-    limit 1
-  `).catch(() => ({ rows: [] as any[] }));
+  const mapped = forcedProductId
+    ? { rows: [{ product_id: forcedProductId }] as any[] }
+    : await db.execute(sql`
+        select product_id
+        from public.product_url_map
+        where url_hash = md5(lower(${url}))
+          ${sourceId ? sql`and source_id = ${sourceId}::uuid` : sql``}
+        limit 1
+      `).catch(() => ({ rows: [] as any[] }));
 
   const mappedId = (mapped.rows as any[])[0]?.product_id as string | undefined;
   if (mappedId) {
@@ -1281,6 +1393,17 @@ async function upsertProduct(
         where id = ${mappedId}::uuid
       `).catch(() => {});
     }
+    if (forcedProductId && sourceId) {
+      await db.execute(sql`
+        insert into public.product_url_map (source_id, url, canonical_url, product_id, status, last_seen_at)
+        values (${sourceId}::uuid, ${url}, null, ${mappedId}::uuid, 'mapped', now())
+        on conflict (source_id, url_hash) do update set
+          product_id = excluded.product_id,
+          status = 'mapped',
+          last_seen_at = now(),
+          updated_at = now()
+      `).catch(() => {});
+    }
     return mappedId;
   }
 
@@ -1300,6 +1423,7 @@ async function upsertProduct(
   const existingSubManual = Boolean((byName.rows as any[])[0]?.subcategory_manual ?? false);
 
   if (!productId) {
+    if (!allowCreate) return null;
     // Prefer extended columns if schema supports them.
     let created: any;
     try {

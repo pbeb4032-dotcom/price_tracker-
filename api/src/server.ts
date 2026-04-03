@@ -13,6 +13,7 @@ import { patchViewsBestOffers } from './jobs/patchViewsBestOffers';
 import { patchCategoryGroceriesKey } from './jobs/patchCategoryGroceriesKey';
 import { patchTaxonomyOverridesSchema } from './jobs/patchTaxonomyOverridesSchema';
 import { patchTaxonomyV2Schema } from './jobs/patchTaxonomyV2Schema';
+import { patchPublicationGateSchema } from './jobs/patchPublicationGateSchema';
 import { seedTaxonomyV2 } from './jobs/seedTaxonomyV2';
 import { validateCandidateSources } from './jobs/validateCandidateSources';
 import { activateCandidateSources } from './jobs/activateCandidateSources';
@@ -101,6 +102,16 @@ async function main() {
     logger.info('Admin health schema patched successfully');
   } catch (e: any) {
     logger.warn('patchAdminHealthSchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
+  }
+
+  try {
+    await patchPublicationGateSchema(env as any);
+    logger.info('Publication gate schema patched successfully');
+  } catch (e: any) {
+    logger.warn('patchPublicationGateSchema failed', {
       error: e?.message ?? e,
       stack: e?.stack,
     });
@@ -492,6 +503,10 @@ await db.execute(sql`
     await patchTaxonomyV2Schema(env as any);
   });
 
+  void safeRun('patch_publication_gate_schema', async () => {
+    await patchPublicationGateSchema(env as any);
+  });
+
   void safeRun('seed_taxonomy_v2', async () => {
     await seedTaxonomyV2(env as any);
   });
@@ -593,6 +608,10 @@ await db.execute(sql`
 
   void safeRun('patch_taxonomy_v2_schema', async () => {
     await patchTaxonomyV2Schema(env as any);
+  });
+
+  void safeRun('patch_publication_gate_schema', async () => {
+    await patchPublicationGateSchema(env as any);
   });
 
   void safeRun('seed_taxonomy_v2', async () => {

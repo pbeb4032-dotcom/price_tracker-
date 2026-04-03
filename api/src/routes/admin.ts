@@ -38,6 +38,7 @@ import { backfillGrocerySubcategories } from '../jobs/backfillGrocerySubcategori
 import { applyCategoryOverrides } from '../jobs/applyCategoryOverrides';
 import { extractProductFromHtml } from '../ingestion/productExtract';
 import { patchTaxonomyV2Schema } from '../jobs/patchTaxonomyV2Schema';
+import { patchPublicationGateSchema } from '../jobs/patchPublicationGateSchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
 import { normalizeSiteCategory, taxonomyKeyToCategoryAndSubcategory } from '../ingestion/taxonomyV2';
@@ -1726,6 +1727,14 @@ adminRoutes.post('/jobs/patch_observation_rollups_schema', async (c) => {
   const gate = await requireAdminOrInternal(c);
   if (!gate.ok || !gate.db) return gate.res!;
   const result = await patchObservationRollupsSchema(c.env);
+  return c.json(result);
+});
+
+// Schema: ingestion staging + publication gate foundation
+adminRoutes.post('/jobs/patch_publication_gate_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchPublicationGateSchema(c.env);
   return c.json(result);
 });
 
