@@ -8,6 +8,11 @@ beforeAll(() => { (globalThis as any).ResizeObserver = class { observe() {} unob
 vi.mock('@/hooks/offers/useProductSearch', () => ({ useProductSearch: () => ({ data: [], isLoading: false }) }));
 vi.mock('@/hooks/offers/useProductPriceHistory', () => ({ useProductPriceHistory: () => ({ data: [], isLoading: false, error: null }) }));
 vi.mock('@/hooks/offers/useBestOffers', () => ({ useBestOffers: () => ({ data: [], isLoading: false }) }));
+vi.mock('@/hooks/offers/useApiComparisons', () => ({
+  useCompareOffers: () => ({ data: { offers: [] }, isLoading: false, isFetching: false, error: null }),
+  useCompareProducts: () => ({ data: null, isLoading: false, isFetching: false, error: null }),
+  isSuspectedOffer: () => false,
+}));
 vi.mock('@/lib/seo/useSeoMeta', () => ({ useSeoMeta: () => {} }));
 vi.mock('@/components/AppNavbar', () => ({ default: () => React.createElement('nav'), __esModule: true }));
 vi.mock('@/components/layout/AppFooter', () => ({ default: () => React.createElement('footer'), __esModule: true }));

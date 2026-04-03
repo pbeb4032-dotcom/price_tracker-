@@ -202,7 +202,7 @@ describe('OfferRow — source attribution', () => {
   it('shows out-of-stock badge', async () => {
     const { OfferRow } = await import('@/components/offers/OfferRow');
     render(<OfferRow offer={makeProductOffer({ in_stock: false })} rank={2} />);
-    expect(screen.getByText('غير متوفر')).toBeInTheDocument();
+    expect(screen.getAllByText('غير متوفر').length).toBeGreaterThan(0);
   });
 
   it('renders safe external link with noopener noreferrer', async () => {

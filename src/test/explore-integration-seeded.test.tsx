@@ -48,8 +48,7 @@ describe('ProductCard — seeded fixtures', () => {
   it('renders edge case: missing image uses fallback', async () => {
     const { ProductCard } = await import('@/components/offers/ProductCard');
     wrap(<ProductCard offer={EDGE_CASES.noImage} />);
-    const img = screen.getByAltText(EDGE_CASES.noImage.product_name_ar) as HTMLImageElement;
-    expect(img.src).toContain('placeholder.svg');
+    expect(screen.getByText('لا توجد صورة موثقة')).toBeInTheDocument();
   });
 
   it('renders edge case: discounted product shows discount badge', async () => {

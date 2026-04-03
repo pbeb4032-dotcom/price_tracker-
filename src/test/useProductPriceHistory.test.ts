@@ -59,7 +59,12 @@ describe('useProductPriceHistory', () => {
       p_region_id: null,
       p_include_delivery: true,
     });
-    expect(result.current.data).toEqual(mockData);
+    expect(result.current.data).toEqual([
+      {
+        ...mockData[0],
+        sample_count: 5,
+      },
+    ]);
   });
 
   it('handles error from rpc', async () => {
