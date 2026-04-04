@@ -150,8 +150,37 @@ async function runJob(name: 'seed' | 'ingest' | 'apis' | 'images' | 'run_all') {
   }
 }
 
+function normalizeScopeDomains(input: string): string[] {
+  const raw = String(input ?? '').split(/[,\n\r\t ]+/g);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = String(item || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/\/.*$/, '')
+      .replace(/\/$/, '');
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
+
 export default function AdminPage() {
   const qc = useQueryClient();
+  const [pilotScopePack, setPilotScopePack] = useState<string>('none');
+  const [pilotScopeDomains, setPilotScopeDomains] = useState<string>('');
+
+  const buildPilotScopePayload = (extra: Record<string, unknown> = {}) => {
+    const payload: Record<string, unknown> = { ...extra };
+    const domains = normalizeScopeDomains(pilotScopeDomains);
+    if (domains.length) payload.domains = domains;
+    if (pilotScopePack && pilotScopePack !== 'none') payload.pack = pilotScopePack;
+    return payload;
+  };
 
   // ── Dashboard (RPC) ──
   const dashboard = useQuery({
@@ -364,9 +393,10 @@ export default function AdminPage() {
   });
 
   const validateCandidatesJob = useMutation({
-    mutationFn: async () => apiPost('/admin/jobs/validate_candidates', { limit: 200 }),
+    mutationFn: async () => apiPost('/admin/jobs/validate_candidates', buildPilotScopePayload({ limit: 200 })),
     onSuccess: (r: any) => {
-      toast.success(`تم التحقق: ${r?.validated ?? 0} (Passed: ${r?.passed ?? 0})`);
+      const scope = r?.pack ? ` • pack: ${r.pack}` : Array.isArray(r?.requested_domains) && r.requested_domains.length ? ` • domains: ${r.requested_domains.length}` : '';
+      toast.success(`تم التحقق: ${r?.validated ?? 0} (Passed: ${r?.passed ?? 0})${scope}`);
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
     },
@@ -374,13 +404,51 @@ export default function AdminPage() {
   });
 
   const activateCandidatesJob = useMutation({
-    mutationFn: async () => apiPost('/admin/jobs/activate_candidates', { limit: 300, minScore: 0.7 }),
+    mutationFn: async () => apiPost('/admin/jobs/activate_candidates', buildPilotScopePayload({ limit: 300, minScore: 0.7 })),
     onSuccess: (r: any) => {
-      toast.success(`تم تفعيل ${r?.activated ?? 0} مصدر`);
+      const scope = r?.pack ? ` • pack: ${r.pack}` : Array.isArray(r?.requested_domains) && r.requested_domains.length ? ` • domains: ${r.requested_domains.length}` : '';
+      toast.success(`تم تفعيل ${r?.activated ?? 0} مصدر${scope}`);
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل تفعيل المصادر'),
+  });
+
+  const scopedSeedPilotJob = useMutation({
+    mutationFn: async () => apiPost('/admin/jobs/seed', buildPilotScopePayload({ limit: 500, sitemapMaxPerDomain: 200 })),
+    onSuccess: (r: any) => {
+      const seeded = Number(r?.result?.seeded_total ?? 0);
+      toast.success(`تم Seed pilot: ${seeded} رابط`);
+      qc.invalidateQueries({ queryKey: ['admin', 'ingestion-dashboard'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'فشل Seed pilot'),
+  });
+
+  const scopedIngestPilotJob = useMutation({
+    mutationFn: async () => apiPost('/admin/jobs/ingest', buildPilotScopePayload({ limit: 120, concurrency: 6, perDomain: 12 })),
+    onSuccess: (r: any) => {
+      const ok = Number(r?.result?.succeeded ?? 0);
+      const fail = Number(r?.result?.failed ?? 0);
+      toast.success(`تم Ingest pilot: ok ${ok} • fail ${fail}`);
+      qc.invalidateQueries({ queryKey: ['admin', 'ingestion-dashboard'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
+      qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'فشل Ingest pilot'),
+  });
+
+  const certifySourcesJob = useMutation({
+    mutationFn: async () => apiPost('/admin/jobs/certify_sources', buildPilotScopePayload({ hours: 72, limit: 500, apply: false })),
+    onSuccess: (r: any) => {
+      const scope = r?.pack ? ` • pack: ${r.pack}` : Array.isArray(r?.requested_domains) && r.requested_domains.length ? ` • domains: ${r.requested_domains.length}` : '';
+      toast.success(`Certification dry-run: scanned ${r?.scanned ?? 0} • published ${r?.published ?? 0}${scope}`);
+      qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'فشل Certification dry-run'),
   });
 
   // ── Auto-Discovery (Daily) + Coverage ──
@@ -2184,6 +2252,33 @@ const recomputeTrust = useMutation({
                           <Label>فلترة حسب محافظة/مدينة (CSV)</Label>
                           <Input value={discoverProvinces} onChange={(e) => setDiscoverProvinces(e.target.value)} placeholder="بغداد,البصرة,..." />
                         </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Pack pilot scope</Label>
+                          <Select value={pilotScopePack} onValueChange={setPilotScopePack}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="بدون pack محددة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">بدون pack محددة</SelectItem>
+                              {(sourcePacksIndex.data?.packs ?? []).map((pack) => (
+                                <SelectItem key={pack.id} value={pack.id}>
+                                  {pack.name_ar}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Domains pilot scope (CSV)</Label>
+                          <Input
+                            value={pilotScopeDomains}
+                            onChange={(e) => setPilotScopeDomains(e.target.value)}
+                            placeholder="iraq.talabat.com, totersapp.com, miswag.com"
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            إذا اخترت pack وكتبت domains، النظام يجمعهم سوا ويشغل الـ pilot فقط عليهم.
+                          </div>
+                        </div>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
@@ -2198,6 +2293,21 @@ const recomputeTrust = useMutation({
                         <Button variant="outline" className="gap-2" disabled={activateCandidatesJob.isPending} onClick={() => activateCandidatesJob.mutate()}>
                           <PlayCircle className="h-4 w-4" />
                           Activate Passed
+                        </Button>
+                        <Button variant="outline" className="gap-2" disabled={certifySourcesJob.isPending} onClick={() => certifySourcesJob.mutate()}>
+                          <Activity className="h-4 w-4" />
+                          Certification Dry-Run
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="secondary" className="gap-2" disabled={scopedSeedPilotJob.isPending} onClick={() => scopedSeedPilotJob.mutate()}>
+                          <DatabaseZap className="h-4 w-4" />
+                          Seed Scoped Pilot
+                        </Button>
+                        <Button variant="secondary" className="gap-2" disabled={scopedIngestPilotJob.isPending} onClick={() => scopedIngestPilotJob.mutate()}>
+                          <PlayCircle className="h-4 w-4" />
+                          Ingest Scoped Pilot
                         </Button>
                       </div>
 

@@ -1,5 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { getDb, type Env } from '../db';
 import type { AppAuthContext } from '../auth/appUser';
@@ -74,6 +77,10 @@ import {
 type Ctx = { Bindings: Env; Variables: { auth: AppAuthContext | null } };
 
 export const adminRoutes = new Hono<Ctx>();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const SOURCE_PACKS_DIR = resolve(__dirname, '../../../public/source-packs');
 
 type AdminGate = {
   ok: boolean;
@@ -178,6 +185,59 @@ function normalizeDomainList(input: unknown): string[] {
     out.push(domain);
   }
   return out;
+}
+
+function normalizeSourcePackId(input: unknown): string {
+  return String(input ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\.json$/i, '')
+    .replace(/[^a-z0-9._-]+/g, '');
+}
+
+async function loadSourcePackDomains(packInput: unknown): Promise<{ packId: string | null; packDomains: string[] }> {
+  const packId = normalizeSourcePackId(packInput);
+  if (!packId) return { packId: null, packDomains: [] };
+
+  const filePath = resolve(SOURCE_PACKS_DIR, `${packId}.json`);
+  if (!filePath.startsWith(SOURCE_PACKS_DIR)) throw new Error('invalid_source_pack');
+
+  let raw = '';
+  try {
+    raw = await readFile(filePath, 'utf8');
+  } catch {
+    throw new Error(`source_pack_not_found:${packId}`);
+  }
+
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`source_pack_invalid_json:${packId}`);
+  }
+
+  const plugins = Array.isArray(parsed?.plugins) ? parsed.plugins : [];
+  const packDomains = normalizeDomainList(
+    plugins.map((plugin: any) => plugin?.source?.domain).filter(Boolean),
+  );
+
+  return { packId, packDomains };
+}
+
+async function resolveScopedDomains(body: any): Promise<{
+  packId: string | null;
+  directDomains: string[];
+  packDomains: string[];
+  domains: string[];
+}> {
+  const directDomains = normalizeDomainList((body as any).domains ?? ((body as any).domain ? [String((body as any).domain)] : []));
+  const { packId, packDomains } = await loadSourcePackDomains((body as any).pack ?? (body as any).packId ?? (body as any).source_pack);
+  return {
+    packId,
+    directDomains,
+    packDomains,
+    domains: [...new Set([...directDomains, ...packDomains])],
+  };
 }
 
 function normalizeUrl(input: string): { url: string; domain: string } {
@@ -1619,9 +1679,17 @@ adminRoutes.post('/jobs/seed', async (c) => {
   // Higher defaults to support real coverage. These are per-run budgets.
   const maxUrls = Number((body as any).limit ?? 20000);
   const sitemapMaxPerDomain = Number((body as any).sitemapMaxPerDomain ?? 20000);
-  const domains = normalizeDomainList((body as any).domains ?? ((body as any).domain ? [String((body as any).domain)] : []));
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains(body);
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
   const result = await seedCrawlFrontier(c.env, { maxUrls, sitemapMaxPerDomain, domains });
-  return c.json({ ok: true, job: 'seed', result });
+  return c.json({ ok: true, job: 'seed', pack: packId, result });
 });
 
 adminRoutes.post('/jobs/apis', async (c) => {
@@ -1641,9 +1709,17 @@ adminRoutes.post('/jobs/ingest', async (c) => {
   const limit = Number((body as any).limit ?? 200);
   const concurrency = Number((body as any).concurrency ?? 16);
   const perDomain = Number((body as any).perDomain ?? 40);
-  const domains = normalizeDomainList((body as any).domains ?? ((body as any).domain ? [String((body as any).domain)] : []));
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains(body);
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
   const result = await ingestProductPages(c.env, { limit, concurrency, perDomain, domains });
-  return c.json({ ok: true, job: 'ingest', result });
+  return c.json({ ok: true, job: 'ingest', pack: packId, result });
 });
 
 adminRoutes.post('/jobs/images', async (c) => {
@@ -1718,8 +1794,17 @@ adminRoutes.post('/jobs/validate_candidates', async (c) => {
   if (!gate.ok || !gate.db) return gate.res!;
   const body = await c.req.json().catch(() => ({}));
   const limit = Math.max(1, Math.min(500, Number((body as any).limit ?? 200)));
-  const result = await validateCandidateSources(c.env, { limit });
-  return c.json(result);
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains(body);
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
+  const result = await validateCandidateSources(c.env, { limit, domains });
+  return c.json({ ...result, pack: packId });
 });
 
 // Shadow Mode: activate candidate sources that passed validation
@@ -1729,8 +1814,17 @@ adminRoutes.post('/jobs/activate_candidates', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const limit = Math.max(1, Math.min(2000, Number((body as any).limit ?? 300)));
   const minScore = Math.max(0, Math.min(1, Number((body as any).minScore ?? 0.70)));
-  const result = await activateCandidateSources(c.env, { limit, minScore });
-  return c.json(result);
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains(body);
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
+  const result = await activateCandidateSources(c.env, { limit, minScore, domains });
+  return c.json({ ...result, pack: packId });
 });
 
 // Retro-tag existing sources (best-effort inference of provinces/sectors)
@@ -1952,14 +2046,34 @@ adminRoutes.post('/jobs/certify_sources', async (c) => {
   const hours = Math.max(24, Math.min(24 * 30, Number((body as any).hours ?? 72)));
   const limit = Math.max(1, Math.min(5000, Number((body as any).limit ?? 500)));
   const apply = Boolean((body as any).apply ?? true);
-  const result = await certifySources(c.env, { hours, limit, apply });
-  return c.json(result);
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains(body);
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
+  const result = await certifySources(c.env, { hours, limit, apply, domains });
+  return c.json({ ...result, pack: packId });
 });
 
 adminRoutes.get('/source_certification', async (c) => {
   const gate = await requireAdminOrInternal(c);
   if (!gate.ok || !gate.db) return gate.res!;
   const limit = Math.max(1, Math.min(500, Number(c.req.query('limit') ?? 200)));
+  let domains: string[] = [];
+  try {
+    const scope = await resolveScopedDomains({
+      domain: c.req.query('domain'),
+      domains: c.req.query('domains'),
+      pack: c.req.query('pack'),
+    });
+    domains = scope.domains;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
   const rows = await gate.db.execute(sql`
     select
       ps.id,
@@ -1986,6 +2100,7 @@ adminRoutes.get('/source_certification', async (c) => {
     from public.price_sources ps
     left join public.v_source_health_latest sh on sh.source_id = ps.id
     where ps.country_code = 'IQ'
+      and (${domains.length} = 0 or ps.domain = any(${domains}::text[]))
     order by
       case ps.certification_tier
         when 'suspended' then 0
@@ -1999,7 +2114,7 @@ adminRoutes.get('/source_certification', async (c) => {
       ps.domain asc
     limit ${limit}::int
   `).catch(() => ({ rows: [] as any[] }));
-  return c.json({ ok: true, items: rows.rows ?? [] });
+  return c.json({ ok: true, items: rows.rows ?? [], requested_domains: domains });
 });
 
 adminRoutes.get('/source_certification/runs', async (c) => {

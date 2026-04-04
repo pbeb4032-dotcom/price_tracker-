@@ -5,13 +5,42 @@ type ActivateOpts = {
   limit?: number;
   countryCode?: string;
   minScore?: number;
+  domains?: string[];
 };
+
+function normalizeScopedDomain(input: string): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/\/$/, '');
+}
+
+function normalizeScopedDomains(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[,\n\r\t ]+/g)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = normalizeScopedDomain(String(item ?? ''));
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
 
 export async function activateCandidateSources(env: Env, opts?: ActivateOpts): Promise<any> {
   const db = getDb(env);
   const countryCode = (opts?.countryCode ?? 'IQ').toUpperCase();
   const limit = Math.max(1, Math.min(1000, Number(opts?.limit ?? 300)));
   const minScore = Math.max(0, Math.min(1, Number(opts?.minScore ?? 0.70)));
+  const requestedDomains = normalizeScopedDomains(opts?.domains ?? []);
 
   const rows = await db.execute(sql`
     select id, domain, validation_score, validation_state
@@ -20,12 +49,21 @@ export async function activateCandidateSources(env: Env, opts?: ActivateOpts): P
       and lifecycle_status = 'candidate'
       and validation_state = 'passed'
       and coalesce(validation_score,0) >= ${minScore}::numeric
+      and (${requestedDomains.length} = 0 or domain = any(${requestedDomains}::text[]))
     order by validation_score desc nulls last, created_at asc
     limit ${limit}::int
   `);
 
   const items = (rows.rows as any[]) ?? [];
-  if (!items.length) return { ok: true, activated: 0, message: 'no_passed_candidates' };
+  if (!items.length) {
+    return {
+      ok: true,
+      activated: 0,
+      message: requestedDomains.length ? 'no_matching_passed_candidates' : 'no_passed_candidates',
+      requested_domains: requestedDomains,
+      scoped_domains: [],
+    };
+  }
 
   const activatedDomains: string[] = [];
 
@@ -53,5 +91,11 @@ export async function activateCandidateSources(env: Env, opts?: ActivateOpts): P
     activatedDomains.push(String(r.domain));
   }
 
-  return { ok: true, activated: activatedDomains.length, domains: activatedDomains };
+  return {
+    ok: true,
+    activated: activatedDomains.length,
+    domains: activatedDomains,
+    requested_domains: requestedDomains,
+    scoped_domains: [...new Set(activatedDomains)],
+  };
 }

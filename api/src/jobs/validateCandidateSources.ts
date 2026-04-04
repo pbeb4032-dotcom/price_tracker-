@@ -6,7 +6,35 @@ type ValidateOpts = {
   limit?: number;
   countryCode?: string;
   force?: boolean;
+  domains?: string[];
 };
+
+function normalizeScopedDomain(input: string): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/\/$/, '');
+}
+
+function normalizeScopedDomains(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[,\n\r\t ]+/g)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = normalizeScopedDomain(String(item ?? ''));
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
 
 function scoreFromSignals(signals: { hasCart: boolean; hasProductHints: boolean; hasSitemap: boolean; statusOk: boolean; hasExtraction: boolean }) {
   let s = 0;
@@ -43,6 +71,7 @@ export async function validateCandidateSources(env: Env, opts?: ValidateOpts): P
   const db = getDb(env);
   const countryCode = (opts?.countryCode ?? 'IQ').toUpperCase();
   const limit = Math.max(1, Math.min(500, Number(opts?.limit ?? 200)));
+  const requestedDomains = normalizeScopedDomains(opts?.domains ?? []);
 
   // Pick candidates (or force re-validate any that are candidate/passed/needs_review)
   const rows = await db.execute(sql`
@@ -50,12 +79,21 @@ export async function validateCandidateSources(env: Env, opts?: ValidateOpts): P
     from public.price_sources
     where country_code = ${countryCode}
       and lifecycle_status = 'candidate'
+      and (${requestedDomains.length} = 0 or domain = any(${requestedDomains}::text[]))
     order by coalesce(last_probe_at, created_at) asc
     limit ${limit}::int
   `);
 
   const items = (rows.rows as any[]) ?? [];
-  if (!items.length) return { ok: true, validated: 0, message: 'no_candidates' };
+  if (!items.length) {
+    return {
+      ok: true,
+      validated: 0,
+      message: requestedDomains.length ? 'no_matching_candidates' : 'no_candidates',
+      requested_domains: requestedDomains,
+      scoped_domains: [],
+    };
+  }
 
   const results: any[] = [];
 
@@ -130,6 +168,15 @@ export async function validateCandidateSources(env: Env, opts?: ValidateOpts): P
 
   const passed = results.filter((r) => r.state === 'passed').length;
   const failed = results.filter((r) => r.state === 'failed').length;
+  const scopedDomains = [...new Set(results.map((r) => String(r.domain ?? '')).filter(Boolean))];
 
-  return { ok: true, validated: results.length, passed, failed, results: results.slice(0, 200) };
+  return {
+    ok: true,
+    validated: results.length,
+    passed,
+    failed,
+    results: results.slice(0, 200),
+    requested_domains: requestedDomains,
+    scoped_domains: scopedDomains,
+  };
 }

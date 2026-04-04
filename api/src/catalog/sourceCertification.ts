@@ -240,7 +240,35 @@ export type CertifySourcesOpts = {
   hours?: number;
   countryCode?: string;
   apply?: boolean;
+  domains?: string[];
 };
+
+function normalizeScopedDomain(input: string): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/\/$/, '');
+}
+
+function normalizeScopedDomains(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[,\n\r\t ]+/g)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = normalizeScopedDomain(String(item ?? ''));
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
 
 export async function certifySources(env: Env, opts?: CertifySourcesOpts): Promise<any> {
   const db = getDb(env);
@@ -249,10 +277,19 @@ export async function certifySources(env: Env, opts?: CertifySourcesOpts): Promi
   const countryCode = String(opts?.countryCode ?? 'IQ').toUpperCase();
   const mode = opts?.apply === false ? 'shadow' : 'apply';
   const runId = randomUUID();
+  const requestedDomains = normalizeScopedDomains(opts?.domains ?? []);
 
   await db.execute(sql`
-    insert into public.source_certification_runs (id, mode, status, country_code, window_hours, started_at)
-    values (${runId}::uuid, ${mode}, 'running', ${countryCode}, ${hours}, now())
+    insert into public.source_certification_runs (id, mode, status, country_code, window_hours, notes, started_at)
+    values (
+      ${runId}::uuid,
+      ${mode},
+      'running',
+      ${countryCode},
+      ${hours},
+      ${JSON.stringify({ requested_domains: requestedDomains })}::jsonb,
+      now()
+    )
   `).catch(() => {});
 
   const result = await db.execute(sql`
@@ -314,6 +351,7 @@ export async function certifySources(env: Env, opts?: CertifySourcesOpts): Promi
     left join obs on obs.source_id = ps.id
     left join gate g on g.source_id = ps.id
     where ps.country_code = ${countryCode}
+      and (${requestedDomains.length} = 0 or ps.domain = any(${requestedDomains}::text[]))
     order by coalesce(ps.activated_at, ps.created_at) asc, ps.domain asc
     limit ${limit}::int
   `);
@@ -323,6 +361,7 @@ export async function certifySources(env: Env, opts?: CertifySourcesOpts): Promi
   let publishedCount = 0;
   let sandboxedCount = 0;
   let suspendedCount = 0;
+  const scopedDomains = [...new Set(rows.map((row: any) => String(row.domain ?? '')).filter(Boolean))];
 
   for (const row of rows) {
     const decision = computeSourceCertificationDecision({
@@ -412,6 +451,7 @@ export async function certifySources(env: Env, opts?: CertifySourcesOpts): Promi
       published_count = ${publishedCount},
       sandboxed_count = ${sandboxedCount},
       suspended_count = ${suspendedCount},
+      notes = coalesce(notes, '{}'::jsonb) || ${JSON.stringify({ requested_domains: requestedDomains, scoped_domains: scopedDomains })}::jsonb,
       completed_at = now(),
       updated_at = now()
     where id = ${runId}::uuid
@@ -426,6 +466,8 @@ export async function certifySources(env: Env, opts?: CertifySourcesOpts): Promi
     published: publishedCount,
     sandboxed: sandboxedCount,
     suspended: suspendedCount,
+    requested_domains: requestedDomains,
+    scoped_domains: scopedDomains,
   };
 }
 

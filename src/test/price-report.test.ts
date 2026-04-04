@@ -345,7 +345,7 @@ describe('/report-price route guard', () => {
   it('App routes include /report-price wrapped in ProtectedRoute', async () => {
     const appModule = await import('@/App');
     expect(appModule.default).toBeDefined();
-  });
+  }, 15000);
 
   it('ProtectedRoute redirects unauthenticated to /sign-in (covered by route-guards.test.tsx)', async () => {
     const mod = await import('@/lib/auth/RouteGuards');

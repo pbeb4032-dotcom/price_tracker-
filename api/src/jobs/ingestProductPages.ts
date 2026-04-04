@@ -395,7 +395,7 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
     }
     const claimed = await db.execute(sql`
       select *
-      from public.claim_crawl_frontier_batch(${limit}::int, ${JSON.stringify(excludedDomains)}::text[], ${perDomain}::int)
+      from public.claim_crawl_frontier_batch(${limit}::int, ${excludedDomains}::text[], ${perDomain}::int)
     `);
     const items = (claimed.rows as any[]) ?? [];
     const sourceConditionCache = new Map<string, Awaited<ReturnType<typeof loadSourceConditionContext>>>();
