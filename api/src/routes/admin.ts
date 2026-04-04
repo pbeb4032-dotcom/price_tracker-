@@ -2017,8 +2017,21 @@ adminRoutes.get('/listing_condition/overview', async (c) => {
   if (!gate.ok || !gate.db) return gate.res!;
   const hours = Number(c.req.query('hours') ?? 72);
   const limitSources = Number(c.req.query('limit_sources') ?? 30);
-  const result = await getListingConditionOverview(gate.db, { hours, limitSources });
-  return c.json(result);
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains({
+      domain: c.req.query('domain'),
+      domains: c.req.query('domains'),
+      pack: c.req.query('pack'),
+    });
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
+  const result = await getListingConditionOverview(gate.db, { hours, limitSources, domains });
+  return c.json({ ...result, pack: packId });
 });
 
 adminRoutes.get('/listing_condition/quarantine', async (c) => {
@@ -2029,14 +2042,28 @@ adminRoutes.get('/listing_condition/quarantine', async (c) => {
   const sourceId = c.req.query('source_id') ?? null;
   const sourceDomain = c.req.query('source_domain') ?? null;
   const reason = c.req.query('reason') ?? null;
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains({
+      domain: c.req.query('domain'),
+      domains: c.req.query('domains'),
+      pack: c.req.query('pack'),
+    });
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
   const result = await getListingConditionQuarantine(gate.db, {
     hours,
     limit,
     sourceId,
     sourceDomain,
     reason,
+    domains,
   });
-  return c.json(result);
+  return c.json({ ...result, pack: packId });
 });
 
 adminRoutes.post('/jobs/certify_sources', async (c) => {
@@ -2577,8 +2604,26 @@ adminRoutes.post('/jobs/apply_category_overrides', async (c) => {
 adminRoutes.get('/source_health_latest', async (c) => {
   const gate = await requireAdmin(c);
   if (!gate.ok || !gate.db) return gate.res!;
-  const r = await gate.db.execute(sql`select * from public.v_source_health_latest`);
-  return c.json({ sources: r.rows ?? [] });
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains({
+      domain: c.req.query('domain'),
+      domains: c.req.query('domains'),
+      pack: c.req.query('pack'),
+    });
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
+  const r = await gate.db.execute(sql`
+    select *
+    from public.v_source_health_latest
+    where (${domains.length} = 0 or domain = any(${domains}::text[]))
+    order by coalesce(error_rate, 0) desc nulls last, domain asc
+  `);
+  return c.json({ ok: true, pack: packId, requested_domains: domains, sources: r.rows ?? [] });
 });
 
 
@@ -3140,9 +3185,25 @@ adminRoutes.get('/taxonomy_v2/quarantine', async (c) => {
   if (!gate.ok || !gate.db) return gate.res!;
   const status = String(c.req.query('status') ?? 'pending');
   const limit = Math.max(1, Math.min(200, Number(c.req.query('limit') ?? 50)));
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains({
+      domain: c.req.query('domain'),
+      domains: c.req.query('domains'),
+      pack: c.req.query('pack'),
+    });
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
 
   try {
-    const where = status === 'all' ? sql`` : sql`where q.status = ${status}`;
+    const filters = [];
+    if (status !== 'all') filters.push(sql`q.status = ${status}`);
+    if (domains.length) filters.push(sql`q.domain = any(${domains}::text[])`);
+    const where = filters.length ? sql`where ${sql.join(filters, sql` and `)}` : sql``;
     const r = await gate.db.execute(sql`
       select
         q.id, q.status, q.product_id, q.domain, q.url, q.product_name,
@@ -3155,9 +3216,9 @@ adminRoutes.get('/taxonomy_v2/quarantine', async (c) => {
       order by q.created_at desc
       limit ${limit}
     `);
-    return c.json({ ok: true, items: r.rows ?? [], table_ready: true });
+    return c.json({ ok: true, items: r.rows ?? [], table_ready: true, pack: packId, requested_domains: domains });
   } catch {
-    return c.json({ ok: true, items: [], table_ready: false });
+    return c.json({ ok: true, items: [], table_ready: false, pack: packId, requested_domains: domains });
   }
 });
 

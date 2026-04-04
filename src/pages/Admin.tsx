@@ -23,6 +23,31 @@ import { apiGet, apiPost, apiPatch, apiDelete } from '@/integrations/api/client'
 type SourceKind = 'retailer' | 'marketplace' | 'official';
 
 type SourcePack = { id: string; name_ar: string; description_ar?: string; file: string; count?: number; recommended?: boolean; tags?: string[] };
+type SourceHealthReviewItem = {
+  source_id?: string | null;
+  domain?: string | null;
+  source_name?: string | null;
+  successes?: number | null;
+  failures?: number | null;
+  error_rate?: number | null;
+  anomaly_rate?: number | null;
+  last_success_at?: string | null;
+  last_error_at?: string | null;
+};
+type SourceCertificationReviewItem = {
+  id: string;
+  domain?: string | null;
+  name_ar?: string | null;
+  lifecycle_status?: string | null;
+  validation_state?: string | null;
+  certification_tier?: string | null;
+  certification_status?: string | null;
+  catalog_publish_enabled?: boolean | null;
+  quality_score?: number | null;
+  certification_reason?: string | null;
+  error_rate?: number | null;
+  anomaly_rate?: number | null;
+};
 type QuarantineItem = {
   id: string;
   status: 'pending' | 'approved' | 'rejected' | 'ignored' | string;
@@ -167,6 +192,14 @@ function normalizeScopeDomains(input: string): string[] {
     out.push(domain);
   }
   return out;
+}
+
+function buildScopeQueryString(pack: string, domainsInput: string): string {
+  const params = new URLSearchParams();
+  const domains = normalizeScopeDomains(domainsInput);
+  if (pack && pack !== 'none') params.set('pack', pack);
+  if (domains.length) params.set('domains', domains.join(','));
+  return params.toString();
 }
 
 export default function AdminPage() {
@@ -399,6 +432,7 @@ export default function AdminPage() {
       toast.success(`تم التحقق: ${r?.validated ?? 0} (Passed: ${r?.passed ?? 0})${scope}`);
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل التحقق من المصادر'),
   });
@@ -410,6 +444,8 @@ export default function AdminPage() {
       toast.success(`تم تفعيل ${r?.activated ?? 0} مصدر${scope}`);
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-health'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل تفعيل المصادر'),
   });
@@ -421,6 +457,7 @@ export default function AdminPage() {
       toast.success(`تم Seed pilot: ${seeded} رابط`);
       qc.invalidateQueries({ queryKey: ['admin', 'ingestion-dashboard'] });
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Seed pilot'),
   });
@@ -436,6 +473,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-taxonomy-quarantine'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Ingest pilot'),
   });
@@ -447,6 +485,7 @@ export default function AdminPage() {
       toast.success(`Certification dry-run: scanned ${r?.scanned ?? 0} • published ${r?.published ?? 0}${scope}`);
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Certification dry-run'),
   });
@@ -1073,19 +1112,34 @@ const recomputeTrust = useMutation({
   });
 
   const listingConditionOverview = useQuery({
-    queryKey: ['admin', 'listing-condition-overview', listingConditionHours],
-    queryFn: async () => apiGet<ListingConditionOverview>(`/admin/listing_condition/overview?hours=${listingConditionHours}&limit_sources=30`),
+    queryKey: ['admin', 'listing-condition-overview', listingConditionHours, pilotScopePack, pilotScopeDomains],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('hours', String(listingConditionHours));
+      params.set('limit_sources', '30');
+      const scope = buildScopeQueryString(pilotScopePack, pilotScopeDomains);
+      if (scope) {
+        const scoped = new URLSearchParams(scope);
+        scoped.forEach((value, key) => params.set(key, value));
+      }
+      return apiGet<ListingConditionOverview>(`/admin/listing_condition/overview?${params.toString()}`);
+    },
     staleTime: 15_000,
   });
 
   const listingConditionBlocked = useQuery({
-    queryKey: ['admin', 'listing-condition-quarantine', listingConditionHours, listingConditionReason, listingConditionSourceId],
+    queryKey: ['admin', 'listing-condition-quarantine', listingConditionHours, listingConditionReason, listingConditionSourceId, pilotScopePack, pilotScopeDomains],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('hours', String(listingConditionHours));
       params.set('limit', '50');
       if (listingConditionReason !== 'all') params.set('reason', listingConditionReason);
       if (listingConditionSourceId !== 'all') params.set('source_id', listingConditionSourceId);
+      const scope = buildScopeQueryString(pilotScopePack, pilotScopeDomains);
+      if (scope) {
+        const scoped = new URLSearchParams(scope);
+        scoped.forEach((value, key) => params.set(key, value));
+      }
       const res = await apiGet<{ items?: ListingConditionBlockedItem[] }>(`/admin/listing_condition/quarantine?${params.toString()}`);
       return Array.isArray(res?.items) ? res.items : [];
     },
@@ -1199,6 +1253,85 @@ const recomputeTrust = useMutation({
     },
     staleTime: 0,
   });
+
+  const pilotScopeQuery = useMemo(() => buildScopeQueryString(pilotScopePack, pilotScopeDomains), [pilotScopePack, pilotScopeDomains]);
+  const hasPilotScope = Boolean(pilotScopeQuery);
+  const selectedPilotPack = useMemo(
+    () => (sourcePacksIndex.data?.packs ?? []).find((pack) => pack.id === pilotScopePack) ?? null,
+    [sourcePacksIndex.data, pilotScopePack],
+  );
+
+  const scopedSourceCertification = useQuery({
+    queryKey: ['admin', 'scoped-source-certification', pilotScopeQuery],
+    queryFn: async () => apiGet<{ items?: SourceCertificationReviewItem[] }>(`/admin/source_certification?limit=200${pilotScopeQuery ? `&${pilotScopeQuery}` : ''}`),
+    enabled: hasPilotScope,
+    staleTime: 15_000,
+  });
+
+  const scopedSourceHealth = useQuery({
+    queryKey: ['admin', 'scoped-source-health', pilotScopeQuery],
+    queryFn: async () => apiGet<{ sources?: SourceHealthReviewItem[] }>(`/admin/source_health_latest${pilotScopeQuery ? `?${pilotScopeQuery}` : ''}`),
+    enabled: hasPilotScope,
+    staleTime: 15_000,
+  });
+
+  const scopedTaxonomyQuarantine = useQuery({
+    queryKey: ['admin', 'scoped-taxonomy-quarantine', taxV2Status, pilotScopeQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('status', taxV2Status);
+      params.set('limit', '50');
+      if (pilotScopeQuery) {
+        const scoped = new URLSearchParams(pilotScopeQuery);
+        scoped.forEach((value, key) => params.set(key, value));
+      }
+      return apiGet<{ ok: boolean; items: TaxonomyQuarantineItem[]; table_ready?: boolean }>(`/admin/taxonomy_v2/quarantine?${params.toString()}`);
+    },
+    enabled: hasPilotScope,
+    staleTime: 10_000,
+  });
+
+  const certificationItems = (scopedSourceCertification.data?.items ?? []) as SourceCertificationReviewItem[];
+  const healthItems = (scopedSourceHealth.data?.sources ?? []) as SourceHealthReviewItem[];
+  const taxonomyItems = (scopedTaxonomyQuarantine.data?.items ?? []) as TaxonomyQuarantineItem[];
+
+  const packReviewVerdict = useMemo(() => {
+    if (!hasPilotScope) {
+      return {
+        status: 'idle' as const,
+        reasons: ['اختر pack أو domains حتى يظهر review الحقيقي.'],
+      };
+    }
+
+    const publishedCount = certificationItems.filter((item) => ['published', 'anchor'].includes(String(item.certification_tier ?? ''))).length;
+    const sandboxCount = certificationItems.filter((item) => String(item.certification_tier ?? '') === 'sandbox').length;
+    const mixedBlocked = Number(listingConditionOverview.data?.summary?.mixed_without_allowlist_count ?? 0);
+    const unknownCount = Number(listingConditionOverview.data?.summary?.unknown_candidates ?? 0);
+    const totalCandidates = Number(listingConditionOverview.data?.summary?.total_candidates ?? 0);
+    const unknownRate = totalCandidates > 0 ? unknownCount / totalCandidates : 0;
+    const highErrorSources = healthItems.filter((item) => Number(item.error_rate ?? 0) >= 0.2).length;
+    const taxonomyPending = taxonomyItems.length;
+
+    const stopReasons: string[] = [];
+    if (!certificationItems.length) stopReasons.push('بعد ماكو مصادر ضمن الـ scope الحالي أو بعد ما انزرعت/تفعّلت.');
+    if (mixedBlocked > 0) stopReasons.push(`أكو ${mixedBlocked} listing من mixed sources بدون allowlist نظيف.`);
+    if (unknownRate >= 0.2) stopReasons.push(`unknown condition عالي: ${(unknownRate * 100).toFixed(1)}%.`);
+    if (highErrorSources > 0) stopReasons.push(`أكو ${highErrorSources} مصدر عنده error_rate عالي.`);
+    if (taxonomyPending > 15) stopReasons.push(`taxonomy quarantine مرتفعة: ${taxonomyPending}.`);
+    if (sandboxCount > publishedCount && certificationItems.length > 0) stopReasons.push('عدد sandbox أعلى من published/anchor داخل الحزمة.');
+
+    if (stopReasons.length) return { status: 'stop' as const, reasons: stopReasons };
+    return {
+      status: 'go' as const,
+      reasons: ['الوضع الحالي نظيف بما يكفي للانتقال إلى batch أو pilot أوسع مع نفس الحوكمة.'],
+    };
+  }, [
+    certificationItems,
+    hasPilotScope,
+    healthItems,
+    listingConditionOverview.data,
+    taxonomyItems,
+  ]);
 
   const [packProgress, setPackProgress] = useState<{ packId: string | null; done: number; total: number; errors: number }>({
     packId: null,
@@ -2367,6 +2500,139 @@ const recomputeTrust = useMutation({
                     </CardContent>
                   </Card>
                 </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Pack Certification Review</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!hasPilotScope ? (
+                      <div className="text-sm text-muted-foreground">
+                        اختَر pack أو domains من فوق حتى يظهر review الحقيقي للحزمة الحالية فقط.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={packReviewVerdict.status === 'go' ? 'default' : packReviewVerdict.status === 'stop' ? 'destructive' : 'outline'}>
+                            {packReviewVerdict.status === 'go' ? 'القرار: كمل' : packReviewVerdict.status === 'stop' ? 'القرار: وقف' : 'القرار: اختر scope'}
+                          </Badge>
+                          {selectedPilotPack ? <Badge variant="outline">{selectedPilotPack.name_ar}</Badge> : null}
+                          {normalizeScopeDomains(pilotScopeDomains).length ? (
+                            <Badge variant="outline">domains: {normalizeScopeDomains(pilotScopeDomains).length}</Badge>
+                          ) : null}
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+                          {[
+                            { label: 'Sources in scope', value: certificationItems.length },
+                            { label: 'Published/Anchor', value: certificationItems.filter((item) => ['published', 'anchor'].includes(String(item.certification_tier ?? ''))).length },
+                            { label: 'High-error sources', value: healthItems.filter((item) => Number(item.error_rate ?? 0) >= 0.2).length },
+                            { label: 'Blocked listings', value: Number(listingConditionOverview.data?.summary?.blocked_candidates ?? 0) },
+                            { label: 'Taxonomy quarantine', value: taxonomyItems.length },
+                          ].map((item) => (
+                            <div key={item.label} className="rounded-lg border p-3">
+                              <div className="text-xs text-muted-foreground">{item.label}</div>
+                              <div className="mt-1 text-2xl font-bold">{Number(item.value ?? 0).toLocaleString()}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="rounded-lg border p-3">
+                          <div className="mb-2 text-sm font-medium">أسباب القرار</div>
+                          <div className="space-y-1 text-sm">
+                            {packReviewVerdict.reasons.map((reason) => (
+                              <div key={reason} className="text-muted-foreground">{reason}</div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 lg:grid-cols-3">
+                          <div className="rounded-lg border">
+                            <div className="border-b p-3 text-sm font-medium">Certification</div>
+                            <div className="max-h-[260px] overflow-auto">
+                              {scopedSourceCertification.isLoading ? (
+                                <div className="p-3 text-sm text-muted-foreground">جارٍ تحميل certification…</div>
+                              ) : certificationItems.length === 0 ? (
+                                <div className="p-3 text-sm text-muted-foreground">ماكو certification data ضمن الـ scope الحالي.</div>
+                              ) : (
+                                certificationItems.map((item) => (
+                                  <div key={item.id} className="border-b p-3 text-sm last:border-b-0">
+                                    <div className="font-medium">{item.name_ar || item.domain}</div>
+                                    <div className="text-xs text-muted-foreground">{item.domain}</div>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      <Badge variant="outline">{item.certification_tier || 'n/a'}</Badge>
+                                      <Badge variant="outline">{item.certification_status || 'n/a'}</Badge>
+                                      <Badge variant={item.catalog_publish_enabled ? 'default' : 'secondary'}>
+                                        {item.catalog_publish_enabled ? 'publish on' : 'publish off'}
+                                      </Badge>
+                                      <Badge variant="outline">q {Number(item.quality_score ?? 0).toFixed(2)}</Badge>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border">
+                            <div className="border-b p-3 text-sm font-medium">Health</div>
+                            <div className="max-h-[260px] overflow-auto">
+                              {scopedSourceHealth.isLoading ? (
+                                <div className="p-3 text-sm text-muted-foreground">جارٍ تحميل health…</div>
+                              ) : healthItems.length === 0 ? (
+                                <div className="p-3 text-sm text-muted-foreground">ماكو health data ضمن الـ scope الحالي.</div>
+                              ) : (
+                                healthItems.map((item) => (
+                                  <div key={item.source_id || item.domain} className="border-b p-3 text-sm last:border-b-0">
+                                    <div className="font-medium">{item.source_name || item.domain}</div>
+                                    <div className="text-xs text-muted-foreground">{item.domain}</div>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      <Badge variant="secondary">OK {Number(item.successes ?? 0)}</Badge>
+                                      <Badge variant={Number(item.error_rate ?? 0) >= 0.2 ? 'destructive' : 'outline'}>
+                                        ERR {Math.round(Number(item.error_rate ?? 0) * 100)}%
+                                      </Badge>
+                                      <Badge variant="outline">AN {Math.round(Number(item.anomaly_rate ?? 0) * 100)}%</Badge>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border">
+                            <div className="border-b p-3 text-sm font-medium">Taxonomy / Condition</div>
+                            <div className="max-h-[260px] overflow-auto">
+                              {scopedTaxonomyQuarantine.isLoading ? (
+                                <div className="p-3 text-sm text-muted-foreground">جارٍ تحميل taxonomy quarantine…</div>
+                              ) : (
+                                <>
+                                  <div className="border-b p-3 text-sm">
+                                    <div className="font-medium">Condition blocked</div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                      blocked: {Number(listingConditionOverview.data?.summary?.blocked_candidates ?? 0).toLocaleString()} • mixed بلا allowlist: {Number(listingConditionOverview.data?.summary?.mixed_without_allowlist_count ?? 0).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  {taxonomyItems.length === 0 ? (
+                                    <div className="p-3 text-sm text-muted-foreground">ماكو taxonomy quarantine ضمن الـ scope الحالي.</div>
+                                  ) : (
+                                    taxonomyItems.map((item) => (
+                                      <div key={item.id} className="border-b p-3 text-sm last:border-b-0">
+                                        <div className="font-medium">{item.product_name || 'منتج بدون اسم'}</div>
+                                        <div className="text-xs text-muted-foreground">{item.domain || item.site_category_raw || 'unknown domain'}</div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                          {item.reason || 'no reason'} {item.conflict ? '• conflict' : ''}
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
 
 
                 <div className="grid gap-4 md:grid-cols-2">

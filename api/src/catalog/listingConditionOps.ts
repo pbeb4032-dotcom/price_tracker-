@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 type ListingConditionOverviewOpts = {
   hours?: number;
   limitSources?: number;
+  domains?: string[];
 };
 
 type ListingConditionQuarantineOpts = {
@@ -11,6 +12,7 @@ type ListingConditionQuarantineOpts = {
   reason?: string | null;
   sourceId?: string | null;
   sourceDomain?: string | null;
+  domains?: string[];
 };
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
@@ -19,15 +21,44 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   return Math.max(min, Math.min(max, Math.trunc(parsed)));
 }
 
+function normalizeScopedDomain(input: string): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/\/$/, '');
+}
+
+function normalizeScopedDomains(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[,\n\r\t ]+/g)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = normalizeScopedDomain(String(item ?? ''));
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
+
 export async function getListingConditionOverview(db: any, opts: ListingConditionOverviewOpts = {}) {
   const hours = clampInt(opts.hours, 1, 24 * 30, 72);
   const limitSources = clampInt(opts.limitSources, 1, 200, 30);
+  const requestedDomains = normalizeScopedDomains(opts.domains ?? []);
 
   const summaryRes = await db.execute(sql`
     with filtered as (
       select *
       from public.ingest_listing_candidates
       where created_at >= now() - (${hours}::int * interval '1 hour')
+        and (${requestedDomains.length} = 0 or source_domain = any(${requestedDomains}::text[]))
     )
     select
       count(*)::bigint as total_candidates,
@@ -51,6 +82,7 @@ export async function getListingConditionOverview(db: any, opts: ListingConditio
       from public.ingest_listing_candidates
       where created_at >= now() - (${hours}::int * interval '1 hour')
         and publish_blocked = true
+        and (${requestedDomains.length} = 0 or source_domain = any(${requestedDomains}::text[]))
     )
     select reason_key, count(*)::bigint as count
     from filtered
@@ -72,6 +104,7 @@ export async function getListingConditionOverview(db: any, opts: ListingConditio
         c.matched_section_policy_id
       from public.ingest_listing_candidates c
       where c.created_at >= now() - (${hours}::int * interval '1 hour')
+        and (${requestedDomains.length} = 0 or c.source_domain = any(${requestedDomains}::text[]))
     )
     select
       f.source_id,
@@ -104,6 +137,7 @@ export async function getListingConditionOverview(db: any, opts: ListingConditio
   return {
     ok: true,
     hours,
+    requested_domains: requestedDomains,
     summary: (summaryRes.rows as any[])[0] ?? {},
     reasons: reasonsRes.rows ?? [],
     sources: sourceRes.rows ?? [],
@@ -113,6 +147,7 @@ export async function getListingConditionOverview(db: any, opts: ListingConditio
 export async function getListingConditionQuarantine(db: any, opts: ListingConditionQuarantineOpts = {}) {
   const hours = clampInt(opts.hours, 1, 24 * 30, 72);
   const limit = clampInt(opts.limit, 1, 200, 50);
+  const requestedDomains = normalizeScopedDomains(opts.domains ?? []);
   const filters: any[] = [
     sql`c.created_at >= now() - (${hours}::int * interval '1 hour')`,
     sql`exists (
@@ -133,6 +168,9 @@ export async function getListingConditionQuarantine(db: any, opts: ListingCondit
   }
   if (opts.sourceDomain && String(opts.sourceDomain).trim()) {
     filters.push(sql`c.source_domain = ${String(opts.sourceDomain).trim().toLowerCase()}`);
+  }
+  if (requestedDomains.length) {
+    filters.push(sql`c.source_domain = any(${requestedDomains}::text[])`);
   }
 
   const rows = await db.execute(sql`
@@ -187,6 +225,7 @@ export async function getListingConditionQuarantine(db: any, opts: ListingCondit
   return {
     ok: true,
     hours,
+    requested_domains: requestedDomains,
     items: rows.rows ?? [],
   };
 }
