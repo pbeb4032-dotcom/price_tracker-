@@ -61,6 +61,7 @@ import { getAppSetting } from '../lib/appSettings';
 import { patchAdminHealthSchema } from '../jobs/patchAdminHealthSchema';
 import { getLatestFxPublications, rolloverLatestFxPublicationToLegacy } from '../fx/governedFx';
 import { certifySources, getRecentSourceCertificationRuns } from '../catalog/sourceCertification';
+import { getSourceAdapterReadiness } from '../catalog/sourceAdapterReadiness';
 import { getRecentSourceSeedImportRuns, importSourceSeeds } from '../catalog/sourceSeedImport';
 import { getListingConditionOverview, getListingConditionQuarantine } from '../catalog/listingConditionOps';
 import {
@@ -2624,6 +2625,28 @@ adminRoutes.get('/source_health_latest', async (c) => {
     order by coalesce(error_rate, 0) desc nulls last, domain asc
   `);
   return c.json({ ok: true, pack: packId, requested_domains: domains, sources: r.rows ?? [] });
+});
+
+adminRoutes.get('/source_adapter_readiness', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const limit = Math.max(1, Math.min(500, Number(c.req.query('limit') ?? 200)));
+  let domains: string[] = [];
+  let packId: string | null = null;
+  try {
+    const scope = await resolveScopedDomains({
+      domain: c.req.query('domain'),
+      domains: c.req.query('domains'),
+      pack: c.req.query('pack'),
+    });
+    domains = scope.domains;
+    packId = scope.packId;
+  } catch (error: any) {
+    return c.json({ ok: false, error: String(error?.message ?? error) }, 400);
+  }
+
+  const result = await getSourceAdapterReadiness(gate.db, { domains, limit });
+  return c.json({ ...result, pack: packId });
 });
 
 

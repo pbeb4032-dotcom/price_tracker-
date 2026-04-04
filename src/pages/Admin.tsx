@@ -48,6 +48,57 @@ type SourceCertificationReviewItem = {
   error_rate?: number | null;
   anomaly_rate?: number | null;
 };
+type SourceAdapterReadinessItem = {
+  source_id: string;
+  domain: string;
+  name_ar?: string | null;
+  source_kind?: string | null;
+  source_channel?: string | null;
+  adapter_strategy?: string | null;
+  catalog_condition_policy?: string | null;
+  lifecycle_status?: string | null;
+  validation_state?: string | null;
+  certification_tier?: string | null;
+  certification_status?: string | null;
+  catalog_publish_enabled?: boolean | null;
+  auto_disabled?: boolean | null;
+  render_paused_until?: string | null;
+  js_only?: boolean | null;
+  js_only_reason?: string | null;
+  js_only_hits?: number | null;
+  active_entrypoints?: number | null;
+  active_bootstrap_paths?: number | null;
+  active_api_endpoints?: number | null;
+  active_adapters?: number | null;
+  successes?: number | null;
+  failures?: number | null;
+  error_rate?: number | null;
+  anomaly_rate?: number | null;
+  last_success_at?: string | null;
+  last_error_at?: string | null;
+  readiness_class: 'api_ready' | 'html_ready' | 'needs_mobile_adapter' | 'needs_render' | 'postpone';
+  recommended_path: 'api' | 'html' | 'mobile_adapter' | 'render' | 'hold';
+  readiness_reasons: string[];
+};
+type SourceAdapterReadinessResponse = {
+  ok: boolean;
+  pack?: string | null;
+  requested_domains?: string[];
+  summary?: {
+    total_sources?: number;
+    api_ready?: number;
+    html_ready?: number;
+    needs_mobile_adapter?: number;
+    needs_render?: number;
+    postpone?: number;
+    with_api_endpoints?: number;
+    with_entrypoints?: number;
+    with_bootstrap_paths?: number;
+    js_only_sources?: number;
+    render_paused_sources?: number;
+  };
+  items?: SourceAdapterReadinessItem[];
+};
 type QuarantineItem = {
   id: string;
   status: 'pending' | 'approved' | 'rejected' | 'ignored' | string;
@@ -148,6 +199,49 @@ type SourceSectionPolicyAdmin = {
 };
 
 type SourcePackIndex = { version: string; generated_at: string; packs: SourcePack[] };
+
+const ADAPTER_READINESS_LABELS: Record<SourceAdapterReadinessItem['readiness_class'], string> = {
+  api_ready: 'جاهز API',
+  html_ready: 'جاهز HTML',
+  needs_mobile_adapter: 'يحتاج Mobile Adapter',
+  needs_render: 'يحتاج Render',
+  postpone: 'أجّله',
+};
+
+const ADAPTER_READINESS_BADGES: Record<SourceAdapterReadinessItem['readiness_class'], 'default' | 'secondary' | 'outline' | 'destructive'> = {
+  api_ready: 'default',
+  html_ready: 'secondary',
+  needs_mobile_adapter: 'outline',
+  needs_render: 'outline',
+  postpone: 'destructive',
+};
+
+const ADAPTER_PATH_LABELS: Record<SourceAdapterReadinessItem['recommended_path'], string> = {
+  api: 'API',
+  html: 'HTML',
+  mobile_adapter: 'Mobile Adapter',
+  render: 'Render',
+  hold: 'Hold',
+};
+
+const ADAPTER_REASON_LABELS: Record<string, string> = {
+  auto_disabled: 'auto-disabled',
+  source_suspended: 'suspended',
+  high_error_rate: 'error rate عالي',
+  render_paused: 'render paused',
+  mobile_api_endpoints_configured: 'mobile endpoints موجودة',
+  mobile_source_without_api_endpoints: 'mobile source بلا endpoints',
+  js_only_detected: 'js-only detected',
+  rendered_strategy_selected: 'rendered strategy',
+  active_api_endpoints_present: 'api endpoints موجودة',
+  html_entrypoints_present: 'entrypoints موجودة',
+  bootstrap_paths_present: 'bootstrap paths موجودة',
+  adapter_rules_present: 'adapter rules موجودة',
+  structured_api_without_endpoints: 'structured api بلا endpoints',
+  social_intake_requires_manual_pipeline: 'social/manual source',
+  insufficient_adapter_signals: 'signals غير كافية',
+  source_health_unstable: 'source health unstable',
+};
 
 const DEFAULT_PRODUCT_REGEX = String.raw`\/(product|products|p|item|dp)\/`;
 const DEFAULT_CATEGORY_REGEX = String.raw`\/(category|categories|collections|shop|store|department|c|offers)\/`;
@@ -250,6 +344,7 @@ export default function AdminPage() {
       toast.success('تمت إضافة المصدر');
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل إضافة المصدر'),
   });
@@ -262,6 +357,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل التحديث'),
   });
@@ -433,6 +529,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل التحقق من المصادر'),
   });
@@ -446,6 +543,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-health'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل تفعيل المصادر'),
   });
@@ -458,6 +556,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'ingestion-dashboard'] });
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Seed pilot'),
   });
@@ -474,6 +573,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-taxonomy-quarantine'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Ingest pilot'),
   });
@@ -486,6 +586,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Certification dry-run'),
   });
@@ -1275,6 +1376,13 @@ const recomputeTrust = useMutation({
     staleTime: 15_000,
   });
 
+  const scopedSourceAdapterReadiness = useQuery({
+    queryKey: ['admin', 'scoped-source-adapter-readiness', pilotScopeQuery],
+    queryFn: async () => apiGet<SourceAdapterReadinessResponse>(`/admin/source_adapter_readiness?limit=200${pilotScopeQuery ? `&${pilotScopeQuery}` : ''}`),
+    enabled: hasPilotScope,
+    staleTime: 15_000,
+  });
+
   const scopedTaxonomyQuarantine = useQuery({
     queryKey: ['admin', 'scoped-taxonomy-quarantine', taxV2Status, pilotScopeQuery],
     queryFn: async () => {
@@ -1293,6 +1401,8 @@ const recomputeTrust = useMutation({
 
   const certificationItems = (scopedSourceCertification.data?.items ?? []) as SourceCertificationReviewItem[];
   const healthItems = (scopedSourceHealth.data?.sources ?? []) as SourceHealthReviewItem[];
+  const adapterReadinessItems = (scopedSourceAdapterReadiness.data?.items ?? []) as SourceAdapterReadinessItem[];
+  const adapterReadinessSummary = scopedSourceAdapterReadiness.data?.summary ?? {};
   const taxonomyItems = (scopedTaxonomyQuarantine.data?.items ?? []) as TaxonomyQuarantineItem[];
 
   const packReviewVerdict = useMemo(() => {
@@ -1371,6 +1481,7 @@ const recomputeTrust = useMutation({
 	    toast.success('تم تنصيب الحزمة بنجاح');
 	    qc.invalidateQueries({ queryKey: ['admin', 'site-plugins'] });
 	    qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
 	  },
 	  onError: (e: any) => {
 	    toast.error(e?.message || 'فشل تنصيب الحزمة');
@@ -1396,6 +1507,7 @@ const recomputeTrust = useMutation({
       toast.success('تم استيراد البلجن');
       qc.invalidateQueries({ queryKey: ['admin', 'site-plugins'] });
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل استيراد البلجن'),
   });
@@ -2627,6 +2739,114 @@ const recomputeTrust = useMutation({
                                 </>
                               )}
                             </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Adapter Readiness Dashboard</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!hasPilotScope ? (
+                      <div className="text-sm text-muted-foreground">
+                        اختَر pack أو domains حتى يطلع لك readiness حقيقي لكل source ضمن الـ pilot الحالي.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {selectedPilotPack ? <Badge variant="outline">{selectedPilotPack.name_ar}</Badge> : null}
+                          {normalizeScopeDomains(pilotScopeDomains).length ? (
+                            <Badge variant="outline">domains: {normalizeScopeDomains(pilotScopeDomains).length}</Badge>
+                          ) : null}
+                          <Badge variant="secondary">sources: {Number(adapterReadinessSummary.total_sources ?? 0).toLocaleString()}</Badge>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+                          {[
+                            { label: 'جاهز API', value: adapterReadinessSummary.api_ready },
+                            { label: 'جاهز HTML', value: adapterReadinessSummary.html_ready },
+                            { label: 'يحتاج Mobile Adapter', value: adapterReadinessSummary.needs_mobile_adapter },
+                            { label: 'يحتاج Render', value: adapterReadinessSummary.needs_render },
+                            { label: 'أجّله', value: adapterReadinessSummary.postpone },
+                          ].map((item) => (
+                            <div key={item.label} className="rounded-lg border p-3">
+                              <div className="text-xs text-muted-foreground">{item.label}</div>
+                              <div className="mt-1 text-2xl font-bold">{Number(item.value ?? 0).toLocaleString()}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                          API endpoints: {Number(adapterReadinessSummary.with_api_endpoints ?? 0).toLocaleString()}
+                          {' • '}
+                          entrypoints: {Number(adapterReadinessSummary.with_entrypoints ?? 0).toLocaleString()}
+                          {' • '}
+                          bootstrap: {Number(adapterReadinessSummary.with_bootstrap_paths ?? 0).toLocaleString()}
+                          {' • '}
+                          js-only: {Number(adapterReadinessSummary.js_only_sources ?? 0).toLocaleString()}
+                          {' • '}
+                          render paused: {Number(adapterReadinessSummary.render_paused_sources ?? 0).toLocaleString()}
+                        </div>
+
+                        <div className="rounded-lg border">
+                          <div className="border-b p-3 text-sm font-medium">Sources Worklist</div>
+                          <div className="max-h-[420px] overflow-auto">
+                            {scopedSourceAdapterReadiness.isLoading ? (
+                              <div className="p-3 text-sm text-muted-foreground">جارٍ تحميل adapter readiness…</div>
+                            ) : adapterReadinessItems.length === 0 ? (
+                              <div className="p-3 text-sm text-muted-foreground">ماكو readiness data ضمن الـ scope الحالي.</div>
+                            ) : (
+                              adapterReadinessItems.map((item) => (
+                                <div key={item.source_id} className="border-b p-3 text-sm last:border-b-0">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="font-medium">{item.name_ar || item.domain}</div>
+                                      <div className="text-xs text-muted-foreground">{item.domain}</div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge variant={ADAPTER_READINESS_BADGES[item.readiness_class]}>
+                                        {ADAPTER_READINESS_LABELS[item.readiness_class]}
+                                      </Badge>
+                                      <Badge variant="outline">
+                                        {ADAPTER_PATH_LABELS[item.recommended_path]}
+                                      </Badge>
+                                      {item.adapter_strategy ? <Badge variant="secondary">{item.adapter_strategy}</Badge> : null}
+                                      {item.source_channel ? <Badge variant="secondary">{item.source_channel}</Badge> : null}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                    <span>api: {Number(item.active_api_endpoints ?? 0)}</span>
+                                    <span>html: {Number(item.active_entrypoints ?? 0)}</span>
+                                    <span>bootstrap: {Number(item.active_bootstrap_paths ?? 0)}</span>
+                                    <span>adapters: {Number(item.active_adapters ?? 0)}</span>
+                                    <span>err: {Math.round(Number(item.error_rate ?? 0) * 100)}%</span>
+                                    {item.js_only ? <span>js-only</span> : null}
+                                    {item.render_paused_until && new Date(item.render_paused_until).getTime() > Date.now() ? <span>render paused</span> : null}
+                                  </div>
+
+                                  {item.readiness_reasons?.length ? (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {item.readiness_reasons.slice(0, 4).map((reason) => (
+                                        <Badge key={`${item.source_id}-${reason}`} variant="outline" className="text-[11px]">
+                                          {ADAPTER_REASON_LABELS[reason] || reason}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ) : null}
+
+                                  {item.js_only_reason ? (
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                      js-only reason: {item.js_only_reason}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ))
+                            )}
                           </div>
                         </div>
                       </>
