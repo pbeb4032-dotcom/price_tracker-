@@ -1,6 +1,6 @@
 # Price Tracker Iraq - Full Start-to-End Audit
 
-Date: 2026-04-03
+Date: 2026-04-04
 Branch inspected: `prod-ready`
 Remote inspected: `https://github.com/pbeb4032-dotcom/price_tracker-.git`
 
@@ -582,6 +582,233 @@ Current validation state:
 - `npm --prefix api test` passes
 - `npm test` passes
 - `npm run build` passes
+
+## Architecture Hardening Status (2026-04-04)
+
+The most important change since the original audit is that the repository is no longer in the same architectural state described at the top of this file.
+
+Several root-cause fixes were implemented and pushed on `prod-ready` after the original audit:
+
+- `Sprint 1`: publication gate + staging/decision records
+- `Sprint 2`: canonical identity foundation
+- `Sprint 3`: taxonomy governance over canonical variants
+- `Sprint 4`: barcode / QR resolution engine
+- `Sprint 5`: governed Iraq FX pipeline
+- `Sprint 6`: source certification + server-side ranking truth
+
+These changes materially improved the system and reduced the gap between "a lot of code" and "controlled production architecture".
+
+### 1. Publication Gate is now real
+
+The system now has a real ingest gate instead of letting raw ingest mutate public truth directly.
+
+Implemented foundations:
+
+- `public.ingest_documents`
+- `public.ingest_listing_candidates`
+- `public.ingest_decisions`
+- `public.catalog_publish_queue`
+
+Current behavior:
+
+- raw ingest is recorded before publication
+- ambiguous items fail closed
+- exact-name fallback is no longer enough to publish
+- trusted URL / identifier / canonical matches are now the intended publish path
+
+This is the single most important anti-pollution improvement made in the codebase.
+
+### 2. Canonical Identity now exists
+
+The repo now has a real canonical identity layer instead of pretending a legacy `products` row can represent everything.
+
+Implemented foundations:
+
+- `public.catalog_product_families`
+- `public.catalog_product_variants`
+- `public.catalog_variant_identifiers`
+- `public.catalog_variant_legacy_links`
+- `public.catalog_merchant_listings`
+- `public.catalog_identity_decisions`
+
+Current behavior:
+
+- family, variant, listing, and identifier responsibilities are now separated
+- publication gate can resolve canonical family/variant
+- barcode and taxonomy logic now have a real identity target
+
+This does not yet mean the entire old catalog has been perfectly cleaned, but it does mean the architecture now has the right target shape.
+
+### 3. Taxonomy is now governed above identity
+
+The repo now has canonical-variant taxonomy governance rather than only heuristic route/job classification on legacy products.
+
+Implemented foundations:
+
+- `public.catalog_taxonomy_shadow_runs`
+- `public.catalog_taxonomy_decisions`
+- `public.catalog_taxonomy_quarantine`
+- `public.catalog_taxonomy_metrics_daily`
+
+Current behavior:
+
+- deny rules for toxic category contamination are explicit
+- weak or conflicting taxonomy decisions are quarantined
+- shadow reclassification runs operate on canonical variants, not raw `products`
+
+This is the first serious step toward solving the "food contains junk" problem from the root instead of cosmetically.
+
+### 4. Barcode / QR is now a service, not just a fallback route
+
+The repo now has a dedicated barcode resolution layer with auditability.
+
+Implemented foundations:
+
+- `public.barcode_resolution_runs`
+- `public.barcode_resolution_candidates`
+- `public.barcode_external_catalog_cache`
+
+Current behavior:
+
+- QR / GS1 parsing
+- GTIN validation
+- canonical identifier lookup
+- external catalog lookup
+- deterministic candidate scoring
+- ranked resolution output with audit history
+
+This is still not the final form of a market-dominating barcode engine, but it is now a real subsystem rather than scattered fallback logic.
+
+### 5. FX is now governed
+
+The repo now has a real FX publication layer rather than only a loose scrape/update job.
+
+Implemented foundations:
+
+- `public.fx_sources`
+- `public.fx_observations`
+- `public.fx_publications`
+- `public.fx_publication_inputs`
+
+Current behavior:
+
+- official and market rates are separated
+- publication status can be `current`, `stale`, `frozen`, `fallback`, or `unavailable`
+- pricing jobs now read governed FX truth instead of directly trusting legacy `exchange_rates`
+- `/tables/exchange_rates` remains backward-compatible while preferring governed publications
+
+Operationally, the local environment confirmed the FX pipeline works end-to-end, but also exposed that local source configuration is weak. On the local DB used during validation:
+
+- official rate was published through fallback API evidence
+- market rate fell back to stale prior publication
+
+That is not a pipeline bug. It is a source-input reality.
+
+### 6. Source Certification and Server-Side Ranking Truth now exist
+
+The repo now has the beginning of real source governance instead of "validate then activate then trust route ordering".
+
+Implemented foundations:
+
+- `public.source_certification_runs`
+- `public.source_certification_decisions`
+- new `price_sources` fields:
+  - `certification_tier`
+  - `certification_status`
+  - `quality_score`
+  - `catalog_publish_enabled`
+  - `certification_reason`
+  - `certification_meta`
+
+Current behavior:
+
+- candidate sources are no longer promoted straight into public influence
+- activation now moves sources into observed/pending state first
+- certification can classify sources into `sandbox`, `observed`, `published`, `anchor`, or `suspended`
+- public ranking routes now read certification and source quality signals
+- frontend best-offer hook no longer re-sorts over server truth
+
+This is one of the biggest architecture corrections in the repo because it starts to eliminate split-brain ranking.
+
+## Current Reality After Sprints 1-6
+
+The repository is now in a much stronger state than the original audit snapshot.
+
+What is now genuinely stronger:
+
+- ingest pollution controls are real
+- canonical identity exists
+- taxonomy governance exists
+- barcode resolution is structured
+- FX publication is governed
+- source certification exists
+- ranking truth has started moving decisively to the backend
+
+What is still not finished:
+
+- legacy `products` still exists as a large compatibility surface and has not been fully retired into pure projection status
+- `views.ts` still contains too much orchestration logic and should be thinned further into service calls
+- ranking logic now has a backend authority, but some legacy scoring helpers still remain in route code and should be removed in the next cleanup pass
+- local validation for source certification ran successfully, but the local DB used during testing had `0` Iraqi `price_sources`, so real certification quality must still be proven against populated production-like data
+- source onboarding still needs stronger certification-driven rollout discipline in day-to-day operations
+- taxonomy precision, barcode resolution precision, and source quality SLAs still need explicit dashboards and operating thresholds on real traffic
+
+## Updated "What Still Needs to Happen"
+
+These are now the highest-value remaining items before the system can be called fully functional in the elite, controlled sense:
+
+### 1. Finish the migration from legacy `products` truth to compatibility projection
+
+What still needs to happen:
+
+- make canonical variant/family/listing truth the primary authority everywhere
+- keep `products` only as a backward-compatible projection layer
+- remove remaining direct legacy assumptions from routes, jobs, and views
+
+### 2. Complete server-side truth centralization
+
+What still needs to happen:
+
+- move more route-level ranking/orchestration out of `api/src/routes/views.ts`
+- reduce route SQL responsibility and move decision-making into explicit backend services
+- keep frontend rendering-only for offer ordering and trust presentation
+
+### 3. Prove taxonomy quality on populated real data
+
+What still needs to happen:
+
+- run canonical identity backfill on production-like data in batches
+- run taxonomy shadow mode at real scale
+- review quarantine queues
+- publish branch/category precision dashboards
+- refuse cutover decisions until measured precision is strong
+
+### 4. Prove source certification on populated real data
+
+What still needs to happen:
+
+- run certification against a real set of Iraqi sources
+- inspect `/admin/source_certification`
+- inspect `/admin/source_certification/runs`
+- verify that weak sources are held back and strong sources are promoted correctly
+- define promotion/demotion SLOs formally
+
+### 5. Tighten barcode ambiguity handling
+
+What still needs to happen:
+
+- add a review workflow for ambiguous barcode matches before stronger auto-linking
+- use production evidence to tune candidate thresholds
+- measure false positive vs unresolved rate on real scans
+
+### 6. Keep FX source governance improving
+
+What still needs to happen:
+
+- add stronger live Iraqi market sources
+- reduce fallback/stale reliance
+- monitor freshness and anomaly events continuously
+- verify that production FX publications stay current under source failure
 
 Follow-up repo cleanup completed:
 
