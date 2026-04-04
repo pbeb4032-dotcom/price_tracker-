@@ -19,6 +19,7 @@ import { patchCatalogTaxonomyGovernanceSchema } from './jobs/patchCatalogTaxonom
 import { patchBarcodeResolutionSchema } from './jobs/patchBarcodeResolutionSchema';
 import { patchGovernedFxSchema } from './jobs/patchGovernedFxSchema';
 import { patchSourceCertificationSchema } from './jobs/patchSourceCertificationSchema';
+import { patchSourceOnboardingSchema } from './jobs/patchSourceOnboardingSchema';
 import { seedTaxonomyV2 } from './jobs/seedTaxonomyV2';
 import { validateCandidateSources } from './jobs/validateCandidateSources';
 import { activateCandidateSources } from './jobs/activateCandidateSources';
@@ -167,6 +168,16 @@ async function main() {
     logger.info('Source certification schema patched successfully');
   } catch (e: any) {
     logger.warn('patchSourceCertificationSchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
+  }
+
+  try {
+    await patchSourceOnboardingSchema(env as any);
+    logger.info('Source onboarding schema patched successfully');
+  } catch (e: any) {
+    logger.warn('patchSourceOnboardingSchema failed', {
       error: e?.message ?? e,
       stack: e?.stack,
     });

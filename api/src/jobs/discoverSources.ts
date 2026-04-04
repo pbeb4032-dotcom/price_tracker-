@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { getDb, type Env } from '../db';
+import { ensureSourceScaffold } from '../catalog/sourceRegistry';
 
 type DiscoverOpts = {
   target?: number;
@@ -130,34 +131,6 @@ async function crtshDomains(pattern: string): Promise<{ hosts: string[]; error?:
   }
 }
 
-async function ensureSourceScaffold(db: any, domain: string, baseUrl?: string | null) {
-  const DEFAULT_PRODUCT_REGEX = String.raw`\/(product|products|p|item|dp)\/`;
-  const DEFAULT_CATEGORY_REGEX = String.raw`\/(category|categories|collections|shop|store|department|c|offers)\/`;
-
-  const base = (baseUrl?.trim() || `https://${domain}`).replace(/\/$/, '');
-
-  await db.execute(sql`
-    insert into public.domain_url_patterns(domain, product_regex, category_regex)
-    values (${domain}, ${DEFAULT_PRODUCT_REGEX}, ${DEFAULT_CATEGORY_REGEX})
-    on conflict (domain) do update set
-      product_regex = excluded.product_regex,
-      category_regex = excluded.category_regex,
-      updated_at = now()
-  `);
-
-  await db.execute(sql`
-    insert into public.source_entrypoints(domain, url, page_type, priority, is_active)
-    values (${domain}, ${base}, 'unknown', 200, true)
-    on conflict (domain, url) do nothing
-  `);
-
-  await db.execute(sql`
-    insert into public.domain_bootstrap_paths(source_domain, path, page_type, priority, is_active)
-    values (${domain}, '/', 'unknown', 200, true)
-    on conflict (source_domain, path) do nothing
-  `);
-}
-
 export async function discoverSources(env: Env, opts?: DiscoverOpts): Promise<any> {
   const db = getDb(env);
   const target = Math.max(1, Math.min(5000, Number(opts?.target ?? DEFAULT_TARGET)));
@@ -252,7 +225,9 @@ const discoveredVia = discoveryMeta.crtsh.used
       insert into public.price_sources (
         name_ar, domain, source_kind, trust_weight, base_url, logo_url,
         is_active, country_code,
-        lifecycle_status, crawl_enabled, validation_state, discovered_via, discovery_tags
+        lifecycle_status, crawl_enabled, validation_state, discovered_via, discovery_tags,
+        source_channel, adapter_strategy, catalog_condition_policy, condition_confidence,
+        onboarding_origin, source_priority, onboarding_meta
       )
       values (
         ${nameAr},
@@ -267,7 +242,14 @@ const discoveredVia = discoveryMeta.crtsh.used
         true,
         'unvalidated',
         'searxng',
-        ${JSON.stringify({ sectors: opts?.sectors ?? [], provinces: opts?.provinces ?? [], queries })}
+        ${JSON.stringify({ sectors: opts?.sectors ?? [], provinces: opts?.provinces ?? [], queries })},
+        'website',
+        'html_sitemap',
+        'unknown',
+        0.50,
+        'auto_discovery',
+        180,
+        ${JSON.stringify({ imported_by: 'discoverSources', discovered_via: discoveredVia, queries })}
       )
       returning id
     `).catch(() => null);

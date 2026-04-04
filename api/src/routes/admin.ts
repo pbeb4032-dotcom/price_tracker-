@@ -44,6 +44,7 @@ import { patchCatalogTaxonomyGovernanceSchema } from '../jobs/patchCatalogTaxono
 import { patchBarcodeResolutionSchema } from '../jobs/patchBarcodeResolutionSchema';
 import { patchGovernedFxSchema } from '../jobs/patchGovernedFxSchema';
 import { patchSourceCertificationSchema } from '../jobs/patchSourceCertificationSchema';
+import { patchSourceOnboardingSchema } from '../jobs/patchSourceOnboardingSchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
 import { backfillCanonicalIdentity } from '../jobs/backfillCanonicalIdentity';
@@ -57,6 +58,16 @@ import { getAppSetting } from '../lib/appSettings';
 import { patchAdminHealthSchema } from '../jobs/patchAdminHealthSchema';
 import { getLatestFxPublications, rolloverLatestFxPublicationToLegacy } from '../fx/governedFx';
 import { certifySources, getRecentSourceCertificationRuns } from '../catalog/sourceCertification';
+import { getRecentSourceSeedImportRuns, importSourceSeeds } from '../catalog/sourceSeedImport';
+import {
+  DEFAULT_CATEGORY_REGEX,
+  DEFAULT_PRODUCT_REGEX,
+  ensureBaselineSourceAdapter,
+  ensureSourceScaffold,
+  normalizeSourceBaseUrl,
+  normalizeSourceDomain,
+  upsertGovernedSourceProfile,
+} from '../catalog/sourceRegistry';
 
 type Ctx = { Bindings: Env; Variables: { auth: AppAuthContext | null } };
 
@@ -519,84 +530,51 @@ const addSourceSchema = z.object({
   trust_weight: z.number().min(0).max(1),
   base_url: z.string().nullable().optional(),
   logo_url: z.string().nullable().optional(),
+  source_channel: z.string().nullable().optional(),
+  adapter_strategy: z.string().nullable().optional(),
+  condition_policy: z.string().nullable().optional(),
+  condition_confidence: z.number().min(0).max(1).nullable().optional(),
+  source_priority: z.number().int().min(1).max(1000).nullable().optional(),
+  sectors: z.array(z.string().min(1)).nullable().optional(),
+  provinces: z.array(z.string().min(1)).nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
-
-const DEFAULT_PRODUCT_REGEX = String.raw`\/(product|products|p|item|dp)\/`;
-const DEFAULT_CATEGORY_REGEX = String.raw`\/(category|categories|collections|shop|store|department|c|offers)\/`;
 
 adminRoutes.post('/price_sources', async (c) => {
   const gate = await requireAdmin(c);
   if (!gate.ok || !gate.db) return gate.res!;
   const payload = addSourceSchema.parse(await c.req.json());
 
-  const domain = payload.domain
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/$/, '');
-  const baseUrl = (payload.base_url?.trim() || `https://${domain}`).replace(/\/$/, '');
+  const domain = normalizeSourceDomain(payload.domain);
+  const baseUrl = normalizeSourceBaseUrl(payload.base_url, domain);
+  const result = await upsertGovernedSourceProfile(gate.db, {
+    nameAr: payload.name_ar.trim(),
+    domain,
+    baseUrl,
+    sourceKind: payload.source_kind as any,
+    trustWeight: payload.trust_weight,
+    logoUrl: payload.logo_url?.trim() || null,
+    sourceChannel: payload.source_channel as any,
+    adapterStrategy: payload.adapter_strategy as any,
+    catalogConditionPolicy: payload.condition_policy as any,
+    conditionConfidence: payload.condition_confidence ?? null,
+    sourcePriority: payload.source_priority ?? 100,
+    sectors: payload.sectors ?? [],
+    provinces: payload.provinces ?? [],
+    onboardingOrigin: 'admin_manual',
+    onboardingMeta: {
+      notes: payload.notes ?? null,
+      created_from: 'admin.price_sources',
+    },
+  });
 
-  const inserted = await gate.db.execute(sql`
-    insert into public.price_sources (name_ar, domain, source_kind, trust_weight, base_url, logo_url, is_active, country_code)
-    values (
-      ${payload.name_ar.trim()},
-      ${domain},
-      ${payload.source_kind},
-      ${payload.trust_weight},
-      ${baseUrl},
-      ${payload.logo_url?.trim() || null},
-      true,
-      'IQ'
-    )
-    returning id, domain
-  `);
-
-  const sourceId = (inserted.rows as any[])[0]?.id;
-
-  await gate.db.execute(sql`
-    insert into public.domain_url_patterns (domain, product_regex, category_regex)
-    values (${domain}, ${DEFAULT_PRODUCT_REGEX}, ${DEFAULT_CATEGORY_REGEX})
-    on conflict (domain) do update set
-      product_regex = excluded.product_regex,
-      category_regex = excluded.category_regex
-  `);
-
-  await gate.db.execute(sql`
-    insert into public.source_entrypoints (domain, url, page_type, priority, is_active)
-    values (${domain}, ${baseUrl}, 'category', 10, true)
-    on conflict (domain, url) do update set
-      is_active = true,
-      priority = excluded.priority
-  `);
-
-  // Ensure a baseline adapter exists
-  const existing = await gate.db.execute(sql`
-    select id from public.source_adapters
-    where source_id = ${sourceId}::uuid and adapter_type = 'jsonld'
-    limit 1
-  `);
-
-  if (!(existing.rows as any[])[0]?.id) {
-    await gate.db.execute(sql`
-      insert into public.source_adapters (source_id, adapter_type, priority, is_active, selectors)
-      values (
-        ${sourceId}::uuid,
-        'jsonld',
-        10,
-        true,
-        ${JSON.stringify({
-          productName: ['jsonld.name', 'meta:og:title'],
-          description: ['jsonld.description', 'jsonld.offers.description'],
-          price: ['jsonld.offers.price', 'jsonld.offers.lowPrice', 'meta:product:price:amount'],
-          currency: ['jsonld.offers.priceCurrency', 'meta:product:price:currency'],
-          image: ['jsonld.image', 'meta:og:image'],
-          inStock: ['jsonld.offers.availability'],
-        })}::jsonb
-      )
-    `);
-  }
-
-  return c.json({ id: sourceId, domain });
+  return c.json({
+    id: result.sourceId,
+    domain,
+    action: result.action,
+    lifecycle_status: 'candidate',
+    catalog_publish_enabled: false,
+  });
 });
 
 adminRoutes.patch('/price_sources/:id', async (c) => {
@@ -606,7 +584,29 @@ adminRoutes.patch('/price_sources/:id', async (c) => {
   const patch = z.record(z.any()).parse(await c.req.json());
 
   // Only allow a safe subset of fields.
-  const allowed = ['is_active', 'trust_weight', 'name_ar', 'logo_url', 'base_url', 'source_kind', 'render_budget_per_hour', 'render_cache_ttl_min', 'render_stale_serve_min', 'js_only', 'js_only_reason', 'js_only_hits', 'last_js_shell_at', 'probe_enabled', 'render_paused_until'];
+  const allowed = [
+    'is_active',
+    'trust_weight',
+    'name_ar',
+    'logo_url',
+    'base_url',
+    'source_kind',
+    'source_channel',
+    'adapter_strategy',
+    'catalog_condition_policy',
+    'condition_confidence',
+    'onboarding_origin',
+    'source_priority',
+    'render_budget_per_hour',
+    'render_cache_ttl_min',
+    'render_stale_serve_min',
+    'js_only',
+    'js_only_reason',
+    'js_only_hits',
+    'last_js_shell_at',
+    'probe_enabled',
+    'render_paused_until',
+  ];
   const entries = Object.entries(patch).filter(([k]) => allowed.includes(k));
   if (entries.length === 0) return c.json({ ok: true });
 
@@ -1486,25 +1486,19 @@ adminRoutes.post('/smart_import_url', async (c) => {
   let sourceId = (existing.rows as any[])[0]?.id as string | undefined;
 
   if (!sourceId) {
-    const kind = ['retailer','marketplace','official'].includes(String(body.source_kind ?? '').toLowerCase())
-      ? String(body.source_kind).toLowerCase()
-      : 'retailer';
-    const trust = Math.max(0, Math.min(1, Number(body.trust_weight ?? 0.5)));
-    const baseUrl = `https://${domain}`;
-    const ins = await gate.db.execute(sql`
-      insert into public.price_sources (name_ar, domain, source_kind, trust_weight, is_active, country_code, base_url)
-      values (${String(body.name_ar ?? domain)}, ${domain}, ${kind}, ${trust}, true, 'IQ', ${baseUrl})
-      returning id
-    `);
-    sourceId = (ins.rows as any[])[0]?.id;
-
-    await gate.db.execute(sql`
-      insert into public.domain_url_patterns (domain, product_regex, category_regex)
-      values (${domain}, ${DEFAULT_PRODUCT_REGEX}, ${DEFAULT_CATEGORY_REGEX})
-      on conflict (domain) do update set
-        product_regex = excluded.product_regex,
-        category_regex = excluded.category_regex
-    `);
+    const upserted = await upsertGovernedSourceProfile(gate.db, {
+      nameAr: String(body.name_ar ?? domain),
+      domain,
+      baseUrl: normalizeSourceBaseUrl(url, domain),
+      sourceKind: body.source_kind as any,
+      trustWeight: body.trust_weight ?? 0.5,
+      onboardingOrigin: 'admin_smart_import',
+      onboardingMeta: {
+        created_from: 'admin.smart_import_url',
+        seed_url: url,
+      },
+    });
+    sourceId = upserted.sourceId;
   }
 
   // Classify
@@ -1708,6 +1702,33 @@ adminRoutes.post('/jobs/patch_source_certification_schema', async (c) => {
   if (!gate.ok || !gate.db) return gate.res!;
   const result = await patchSourceCertificationSchema(c.env);
   return c.json(result);
+});
+
+adminRoutes.post('/jobs/patch_source_onboarding_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchSourceOnboardingSchema(c.env);
+  return c.json(result);
+});
+
+adminRoutes.post('/source_seed/import', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const body = await c.req.json().catch(() => ({}));
+  const rows = Array.isArray((body as any).rows) ? (body as any).rows : [];
+  if (!rows.length) return c.json({ ok: false, error: 'rows_required' }, 400);
+  const dryRun = Boolean((body as any).dryRun ?? false);
+  const importName = String((body as any).import_name ?? 'iraq_source_seed').trim() || 'iraq_source_seed';
+  const result = await importSourceSeeds(c.env, { rows, dryRun, importName });
+  return c.json(result);
+});
+
+adminRoutes.get('/source_seed/runs', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const limit = Math.max(1, Math.min(100, Number(c.req.query('limit') ?? 20)));
+  const items = await getRecentSourceSeedImportRuns(gate.db, limit);
+  return c.json({ ok: true, items });
 });
 
 adminRoutes.post('/jobs/certify_sources', async (c) => {
@@ -2390,7 +2411,22 @@ adminRoutes.post('/site_plugins/export', async (c) => {
 
   const db = gate.db;
   const source = await db.execute(sql`
-    select id, domain, name_ar, source_kind, trust_weight, is_active, base_url, logo_url
+    select
+      id,
+      domain,
+      name_ar,
+      source_kind,
+      trust_weight,
+      is_active,
+      base_url,
+      logo_url,
+      source_channel,
+      adapter_strategy,
+      catalog_condition_policy,
+      condition_confidence,
+      onboarding_origin,
+      source_priority,
+      discovery_tags
     from public.price_sources
     where domain = ${domain}
     limit 1
@@ -2471,27 +2507,29 @@ adminRoutes.post('/site_plugins/import', async (c) => {
     : 'retailer';
 
   const trust = Math.max(0, Math.min(1, Number(src.trust_weight ?? 0.6)));
-  const baseUrl = String(src.base_url ?? `https://${domain}`).replace(/\/$/, '');
+  const baseUrl = normalizeSourceBaseUrl(String(src.base_url ?? `https://${domain}`), domain);
   const logoUrl = src.logo_url ? String(src.logo_url) : null;
-
-  const existing = await db.execute(sql`select id from public.price_sources where domain=${domain} limit 1`);
-  let sourceId = (existing.rows as any[])[0]?.id as string | undefined;
-
-  if (sourceId) {
-    await db.execute(sql`
-      update public.price_sources
-      set name_ar=${String(src.name_ar ?? domain)}, source_kind=${sourceKind}, trust_weight=${trust},
-          is_active=${src.is_active !== false}, country_code='IQ', base_url=${baseUrl}, logo_url=${logoUrl}
-      where id=${sourceId}::uuid
-    `);
-  } else {
-    const ins = await db.execute(sql`
-      insert into public.price_sources (name_ar, domain, source_kind, trust_weight, is_active, country_code, base_url, logo_url)
-      values (${String(src.name_ar ?? domain)}, ${domain}, ${sourceKind}, ${trust}, ${src.is_active !== false}, 'IQ', ${baseUrl}, ${logoUrl})
-      returning id
-    `);
-    sourceId = (ins.rows as any[])[0]?.id;
-  }
+  const upserted = await upsertGovernedSourceProfile(db, {
+    nameAr: String(src.name_ar ?? domain),
+    domain,
+    baseUrl,
+    sourceKind: sourceKind as any,
+    trustWeight: trust,
+    logoUrl,
+    sourceChannel: src.source_channel as any,
+    adapterStrategy: src.adapter_strategy as any,
+    catalogConditionPolicy: src.catalog_condition_policy as any,
+    conditionConfidence: src.condition_confidence ?? null,
+    sourcePriority: src.source_priority ?? 100,
+    sectors: Array.isArray(src.discovery_tags?.sectors) ? src.discovery_tags.sectors : Array.isArray(plugin.source?.sectors) ? plugin.source.sectors : [],
+    provinces: Array.isArray(src.discovery_tags?.provinces) ? src.discovery_tags.provinces : Array.isArray(plugin.source?.provinces) ? plugin.source.provinces : [],
+    onboardingOrigin: 'site_plugin_import',
+    onboardingMeta: {
+      created_from: 'admin.site_plugins.import',
+      mode,
+    },
+  });
+  const sourceId = upserted.sourceId;
 
   if (!sourceId) return c.json({ success: false, error: 'insert_failed' }, 500);
 
@@ -2507,6 +2545,8 @@ adminRoutes.post('/site_plugins/import', async (c) => {
       product_regex = excluded.product_regex,
       category_regex = excluded.category_regex
   `);
+  await ensureSourceScaffold(db, domain, baseUrl);
+  await ensureBaselineSourceAdapter(db, sourceId);
 
   if (mode === 'replace') {
     await db.execute(sql`delete from public.source_entrypoints where domain=${domain}`);
