@@ -40,6 +40,88 @@ type QuarantineItem = {
   review_note?: string | null;
 };
 
+type ListingConditionOverview = {
+  hours: number;
+  summary?: {
+    total_candidates?: number;
+    approved_candidates?: number;
+    quarantined_candidates?: number;
+    blocked_candidates?: number;
+    new_candidates?: number;
+    unknown_candidates?: number;
+    used_candidates?: number;
+    refurbished_candidates?: number;
+    open_box_candidates?: number;
+    mixed_without_allowlist_count?: number;
+    section_policy_matched_count?: number;
+  };
+  reasons?: Array<{ reason_key: string; count: number }>;
+  sources?: Array<{
+    source_id?: string | null;
+    source_domain?: string | null;
+    source_name?: string | null;
+    source_kind?: string | null;
+    source_channel?: string | null;
+    catalog_condition_policy?: string | null;
+    total_candidates?: number;
+    approved_candidates?: number;
+    quarantined_candidates?: number;
+    blocked_candidates?: number;
+    unknown_candidates?: number;
+    used_candidates?: number;
+    refurbished_candidates?: number;
+    open_box_candidates?: number;
+    mixed_without_allowlist_count?: number;
+    section_policy_matched_count?: number;
+  }>;
+};
+
+type ListingConditionBlockedItem = {
+  id: string;
+  created_at?: string | null;
+  source_id?: string | null;
+  source_domain?: string | null;
+  source_name?: string | null;
+  source_kind?: string | null;
+  source_channel?: string | null;
+  catalog_condition_policy?: string | null;
+  product_name?: string | null;
+  source_url?: string | null;
+  canonical_url?: string | null;
+  category_hint?: string | null;
+  subcategory_hint?: string | null;
+  taxonomy_hint?: string | null;
+  listing_condition?: string | null;
+  condition_confidence?: number | null;
+  condition_policy?: string | null;
+  condition_reason?: string | null;
+  publish_status?: string | null;
+  publish_reason?: string | null;
+  publish_reasons?: string[] | null;
+  matched_section_policy_id?: string | null;
+  section_key?: string | null;
+  section_label?: string | null;
+  section_url?: string | null;
+  policy_scope?: string | null;
+  section_condition_policy?: string | null;
+  payload_excerpt?: string | null;
+};
+
+type SourceSectionPolicyAdmin = {
+  id: string;
+  source_id: string;
+  source_name?: string | null;
+  source_domain?: string | null;
+  source_condition_policy?: string | null;
+  section_key: string;
+  section_label?: string | null;
+  section_url?: string | null;
+  policy_scope: 'allow' | 'block' | string;
+  condition_policy: string;
+  priority: number;
+  is_active: boolean;
+};
+
 type SourcePackIndex = { version: string; generated_at: string; packs: SourcePack[] };
 
 const DEFAULT_PRODUCT_REGEX = String.raw`\/(product|products|p|item|dp)\/`;
@@ -97,12 +179,15 @@ export default function AdminPage() {
       trust_weight: number;
       base_url?: string | null;
       logo_url?: string | null;
+      condition_policy?: string | null;
+      condition_confidence?: number | null;
     }) => {
       return apiPost('/admin/price_sources', payload);
     },
     onSuccess: () => {
       toast.success('تمت إضافة المصدر');
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل إضافة المصدر'),
   });
@@ -113,6 +198,8 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل التحديث'),
   });
@@ -900,6 +987,93 @@ const recomputeTrust = useMutation({
     trust_weight: 0.6,
     base_url: '',
     logo_url: '',
+    condition_policy: 'unknown',
+    condition_confidence: 0.5,
+  });
+
+  const [listingConditionHours, setListingConditionHours] = useState<number>(72);
+  const [listingConditionReason, setListingConditionReason] = useState<string>('all');
+  const [listingConditionSourceId, setListingConditionSourceId] = useState<string>('all');
+  const [sectionPolicySourceId, setSectionPolicySourceId] = useState<string>('all');
+  const [newSectionPolicy, setNewSectionPolicy] = useState({
+    section_key: '',
+    section_label: '',
+    section_url: '',
+    policy_scope: 'allow',
+    condition_policy: 'new_only',
+    priority: 100,
+  });
+
+  const listingConditionOverview = useQuery({
+    queryKey: ['admin', 'listing-condition-overview', listingConditionHours],
+    queryFn: async () => apiGet<ListingConditionOverview>(`/admin/listing_condition/overview?hours=${listingConditionHours}&limit_sources=30`),
+    staleTime: 15_000,
+  });
+
+  const listingConditionBlocked = useQuery({
+    queryKey: ['admin', 'listing-condition-quarantine', listingConditionHours, listingConditionReason, listingConditionSourceId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('hours', String(listingConditionHours));
+      params.set('limit', '50');
+      if (listingConditionReason !== 'all') params.set('reason', listingConditionReason);
+      if (listingConditionSourceId !== 'all') params.set('source_id', listingConditionSourceId);
+      const res = await apiGet<{ items?: ListingConditionBlockedItem[] }>(`/admin/listing_condition/quarantine?${params.toString()}`);
+      return Array.isArray(res?.items) ? res.items : [];
+    },
+    staleTime: 10_000,
+  });
+
+  const sourceSectionPolicies = useQuery({
+    queryKey: ['admin', 'source-section-policies', sectionPolicySourceId],
+    queryFn: async () => {
+      if (!sectionPolicySourceId || sectionPolicySourceId === 'all') return [];
+      const res = await apiGet<{ items?: SourceSectionPolicyAdmin[] }>(
+        `/admin/source_section_policies?source_id=${encodeURIComponent(sectionPolicySourceId)}&limit=100`,
+      );
+      return Array.isArray(res?.items) ? res.items : [];
+    },
+    enabled: Boolean(sectionPolicySourceId && sectionPolicySourceId !== 'all'),
+    staleTime: 10_000,
+  });
+
+  const saveSectionPolicy = useMutation({
+    mutationFn: async (payload: {
+      source_id: string;
+      section_key: string;
+      section_label?: string | null;
+      section_url?: string | null;
+      policy_scope: 'allow' | 'block';
+      condition_policy: string;
+      priority: number;
+    }) => apiPost('/admin/source_section_policies', payload),
+    onSuccess: () => {
+      toast.success('تم حفظ سياسة القسم');
+      qc.invalidateQueries({ queryKey: ['admin', 'source-section-policies'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
+      setNewSectionPolicy({
+        section_key: '',
+        section_label: '',
+        section_url: '',
+        policy_scope: 'allow',
+        condition_policy: 'new_only',
+        priority: 100,
+      });
+    },
+    onError: (e: any) => toast.error(e?.message || 'فشل حفظ سياسة القسم'),
+  });
+
+  const patchSectionPolicy = useMutation({
+    mutationFn: async (payload: { id: string; patch: Record<string, any> }) =>
+      apiPatch(`/admin/source_section_policies/${encodeURIComponent(payload.id)}`, payload.patch),
+    onSuccess: () => {
+      toast.success('تم تحديث سياسة القسم');
+      qc.invalidateQueries({ queryKey: ['admin', 'source-section-policies'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'فشل تحديث سياسة القسم'),
   });
 
   // ── Plugin tools ──
@@ -1059,6 +1233,9 @@ const recomputeTrust = useMutation({
               qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
               qc.invalidateQueries({ queryKey: ['admin', 'ingestion-runs'] });
               qc.invalidateQueries({ queryKey: ['admin', 'ingestion-errors'] });
+              qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
+              qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
+              qc.invalidateQueries({ queryKey: ['admin', 'source-section-policies'] });
             }}
             className="gap-2"
           >
@@ -1152,6 +1329,20 @@ const recomputeTrust = useMutation({
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label>سياسة الحالة</Label>
+                  <Select
+                    value={newSource.condition_policy}
+                    onValueChange={(v) => setNewSource((p) => ({ ...p, condition_policy: v }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new_only">new_only</SelectItem>
+                      <SelectItem value="mixed">mixed</SelectItem>
+                      <SelectItem value="unknown">unknown</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>الثقة (0 - 1)</Label>
                   <Input
                     type="number"
@@ -1160,6 +1351,17 @@ const recomputeTrust = useMutation({
                     max={1}
                     value={newSource.trust_weight}
                     onChange={(e) => setNewSource((p) => ({ ...p, trust_weight: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Condition confidence</Label>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    min={0}
+                    max={1}
+                    value={newSource.condition_confidence}
+                    onChange={(e) => setNewSource((p) => ({ ...p, condition_confidence: Number(e.target.value) }))}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1191,6 +1393,8 @@ const recomputeTrust = useMutation({
                         trust_weight: newSource.trust_weight,
                         base_url: newSource.base_url || null,
                         logo_url: newSource.logo_url || null,
+                        condition_policy: newSource.condition_policy || null,
+                        condition_confidence: Number.isFinite(newSource.condition_confidence) ? newSource.condition_confidence : null,
                       })
                     }
                   >
@@ -1250,6 +1454,34 @@ const recomputeTrust = useMutation({
                           />
                         </div>
                         <div className="space-y-1">
+                          <Label className="text-xs">Condition policy</Label>
+                          <Select
+                            value={String((s as any).catalog_condition_policy ?? 'unknown')}
+                            onValueChange={(v) => updateSource.mutate({ id: s.id, patch: { catalog_condition_policy: v } })}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="new_only">new_only</SelectItem>
+                              <SelectItem value="mixed">mixed</SelectItem>
+                              <SelectItem value="unknown">unknown</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Condition confidence</Label>
+                          <Input
+                            type="number"
+                            step="0.05"
+                            min={0}
+                            max={1}
+                            defaultValue={Number((s as any).condition_confidence ?? 0.5)}
+                            onBlur={(e) => {
+                              const v = Number((e.target as HTMLInputElement).value);
+                              if (Number.isFinite(v)) updateSource.mutate({ id: s.id, patch: { condition_confidence: v } });
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
                           <Label className="text-xs">Base URL</Label>
                           <Input
                             defaultValue={s.base_url ?? ''}
@@ -1276,6 +1508,315 @@ const recomputeTrust = useMutation({
                       </div>
                     </div>
                   ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">حوكمة المنتجات الجديدة فقط</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="space-y-2">
+                    <Label>نافذة القياس (ساعة)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={720}
+                      value={listingConditionHours}
+                      onChange={(e) => setListingConditionHours(Number(e.target.value))}
+                      className="w-[140px]"
+                    />
+                  </div>
+                  <Button variant="outline" onClick={() => {
+                    listingConditionOverview.refetch();
+                    listingConditionBlocked.refetch();
+                  }}>
+                    تحديث
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+                  {[
+                    { label: 'إجمالي candidates', value: listingConditionOverview.data?.summary?.total_candidates ?? 0 },
+                    { label: 'Approved', value: listingConditionOverview.data?.summary?.approved_candidates ?? 0 },
+                    { label: 'Blocked', value: listingConditionOverview.data?.summary?.blocked_candidates ?? 0 },
+                    { label: 'Unknown', value: listingConditionOverview.data?.summary?.unknown_candidates ?? 0 },
+                    { label: 'Used/Refurb/Open-box', value: Number(listingConditionOverview.data?.summary?.used_candidates ?? 0) + Number(listingConditionOverview.data?.summary?.refurbished_candidates ?? 0) + Number(listingConditionOverview.data?.summary?.open_box_candidates ?? 0) },
+                    { label: 'Mixed بلا allowlist', value: listingConditionOverview.data?.summary?.mixed_without_allowlist_count ?? 0 },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg border p-3">
+                      <div className="text-xs text-muted-foreground">{item.label}</div>
+                      <div className="text-2xl font-bold mt-1">{Number(item.value ?? 0).toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">أكثر أسباب الحجز</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      variant={listingConditionReason === 'all' ? 'default' : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => setListingConditionReason('all')}
+                    >
+                      الكل
+                    </Badge>
+                    {(listingConditionOverview.data?.reasons ?? []).map((item) => (
+                      <Badge
+                        key={item.reason_key}
+                        variant={listingConditionReason === item.reason_key ? 'default' : 'outline'}
+                        className="cursor-pointer"
+                        onClick={() => setListingConditionReason(item.reason_key)}
+                      >
+                        {item.reason_key} • {Number(item.count ?? 0).toLocaleString()}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border">
+                  <div className="border-b p-3 text-sm font-medium">أكثر المصادر التي تُحجز منها listings</div>
+                  <div className="max-h-[280px] overflow-auto">
+                    {(listingConditionOverview.data?.sources ?? []).length === 0 ? (
+                      <div className="p-3 text-sm text-muted-foreground">لا توجد بيانات condition بعد.</div>
+                    ) : (
+                      (listingConditionOverview.data?.sources ?? []).map((item) => (
+                        <div key={`${item.source_id ?? item.source_domain}`} className="grid gap-2 border-b p-3 text-sm last:border-b-0 md:grid-cols-[minmax(0,2fr),repeat(5,minmax(0,1fr))]">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{item.source_name || item.source_domain || 'مصدر غير معروف'}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {item.source_domain} • {item.catalog_condition_policy || 'unknown'} • {item.source_kind || 'n/a'}
+                            </div>
+                          </div>
+                          <div>total: {Number(item.total_candidates ?? 0).toLocaleString()}</div>
+                          <div>blocked: {Number(item.blocked_candidates ?? 0).toLocaleString()}</div>
+                          <div>unknown: {Number(item.unknown_candidates ?? 0).toLocaleString()}</div>
+                          <div>mixed: {Number(item.mixed_without_allowlist_count ?? 0).toLocaleString()}</div>
+                          <div>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setListingConditionSourceId(String(item.source_id ?? 'all'));
+                              if (item.source_id) setSectionPolicySourceId(String(item.source_id));
+                            }}>
+                              فلترة
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Section policies للمصادر الـ mixed</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>اختر المصدر</Label>
+                    <Select value={sectionPolicySourceId} onValueChange={setSectionPolicySourceId}>
+                      <SelectTrigger><SelectValue placeholder="اختر مصدر" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">اختر مصدر</SelectItem>
+                        {(sources.data ?? []).map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name_ar} • {s.domain}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>فلتر quarantine حسب المصدر</Label>
+                    <Select value={listingConditionSourceId} onValueChange={setListingConditionSourceId}>
+                      <SelectTrigger><SelectValue placeholder="كل المصادر" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل المصادر</SelectItem>
+                        {(sources.data ?? []).map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name_ar} • {s.domain}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {sectionPolicySourceId === 'all' ? (
+                  <div className="text-sm text-muted-foreground">اختر مصدرًا حتى تضيف أو تعدّل section allowlists/blocklists.</div>
+                ) : (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label>Section key</Label>
+                        <Input value={newSectionPolicy.section_key} onChange={(e) => setNewSectionPolicy((prev) => ({ ...prev, section_key: e.target.value }))} placeholder="new_arrivals" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Section label</Label>
+                        <Input value={newSectionPolicy.section_label} onChange={(e) => setNewSectionPolicy((prev) => ({ ...prev, section_label: e.target.value }))} placeholder="New Arrivals" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Section URL</Label>
+                        <Input value={newSectionPolicy.section_url} onChange={(e) => setNewSectionPolicy((prev) => ({ ...prev, section_url: e.target.value }))} placeholder="/new-arrivals" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Policy scope</Label>
+                        <Select value={newSectionPolicy.policy_scope} onValueChange={(v) => setNewSectionPolicy((prev) => ({ ...prev, policy_scope: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="allow">allow</SelectItem>
+                            <SelectItem value="block">block</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Condition policy</Label>
+                        <Select value={newSectionPolicy.condition_policy} onValueChange={(v) => setNewSectionPolicy((prev) => ({ ...prev, condition_policy: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="new_only">new_only</SelectItem>
+                            <SelectItem value="mixed">mixed</SelectItem>
+                            <SelectItem value="unknown">unknown</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Priority</Label>
+                        <Input type="number" min={1} max={1000} value={newSectionPolicy.priority} onChange={(e) => setNewSectionPolicy((prev) => ({ ...prev, priority: Number(e.target.value) }))} />
+                      </div>
+                    </div>
+
+                    <Button
+                      disabled={saveSectionPolicy.isPending || !newSectionPolicy.section_key.trim()}
+                      onClick={() => saveSectionPolicy.mutate({
+                        source_id: sectionPolicySourceId,
+                        section_key: newSectionPolicy.section_key.trim(),
+                        section_label: newSectionPolicy.section_label.trim() || null,
+                        section_url: newSectionPolicy.section_url.trim() || null,
+                        policy_scope: newSectionPolicy.policy_scope as 'allow' | 'block',
+                        condition_policy: newSectionPolicy.condition_policy,
+                        priority: Number(newSectionPolicy.priority || 100),
+                      })}
+                    >
+                      حفظ section policy
+                    </Button>
+
+                    <div className="rounded-lg border">
+                      <div className="border-b p-3 text-sm font-medium">السياسات الحالية</div>
+                      <div className="max-h-[280px] overflow-auto">
+                        {(sourceSectionPolicies.data ?? []).length === 0 ? (
+                          <div className="p-3 text-sm text-muted-foreground">لا توجد section policies لهذا المصدر بعد.</div>
+                        ) : (
+                          (sourceSectionPolicies.data ?? []).map((policy) => (
+                            <div key={policy.id} className="grid gap-3 border-b p-3 text-sm last:border-b-0 md:grid-cols-[minmax(0,2fr),minmax(0,1fr),minmax(0,1fr),auto]">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{policy.section_label || policy.section_key}</div>
+                                <div className="text-xs text-muted-foreground truncate">{policy.section_url || policy.section_key}</div>
+                              </div>
+                              <div className="space-y-2">
+                                <Select
+                                  value={String(policy.policy_scope)}
+                                  onValueChange={(v) => patchSectionPolicy.mutate({ id: policy.id, patch: { policy_scope: v } })}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="allow">allow</SelectItem>
+                                    <SelectItem value="block">block</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={String(policy.condition_policy)}
+                                  onValueChange={(v) => patchSectionPolicy.mutate({ id: policy.id, patch: { condition_policy: v } })}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="new_only">new_only</SelectItem>
+                                    <SelectItem value="mixed">mixed</SelectItem>
+                                    <SelectItem value="unknown">unknown</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={1000}
+                                  defaultValue={Number(policy.priority ?? 100)}
+                                  onBlur={(e) => patchSectionPolicy.mutate({ id: policy.id, patch: { priority: Number((e.target as HTMLInputElement).value || 100) } })}
+                                />
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-xs text-muted-foreground">مفعّل</Label>
+                                  <Switch
+                                    checked={Boolean(policy.is_active)}
+                                    onCheckedChange={(checked) => patchSectionPolicy.mutate({ id: policy.id, patch: { is_active: checked } })}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-start justify-end">
+                                <Badge variant={policy.is_active ? 'default' : 'outline'}>
+                                  {policy.is_active ? 'active' : 'inactive'}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">آخر listings المحجوزة بسبب condition gate</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {listingConditionBlocked.isLoading ? (
+                  <div className="text-sm text-muted-foreground">جاري تحميل العناصر المحجوزة…</div>
+                ) : listingConditionBlocked.isError ? (
+                  <div className="text-sm text-destructive">تعذّر تحميل عناصر condition quarantine.</div>
+                ) : (listingConditionBlocked.data?.length ?? 0) === 0 ? (
+                  <div className="text-sm text-muted-foreground">لا توجد عناصر محجوزة ضمن الفلاتر الحالية.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {(listingConditionBlocked.data ?? []).map((item) => (
+                      <div key={item.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{item.product_name || 'منتج بدون اسم'}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {item.source_name || item.source_domain || 'مصدر غير معروف'} • {item.catalog_condition_policy || 'unknown'}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{item.listing_condition || 'unknown'}</Badge>
+                            <Badge variant="destructive">{item.condition_reason || item.publish_reason || 'blocked'}</Badge>
+                            {typeof item.condition_confidence === 'number' ? (
+                              <Badge variant="outline">{Math.round(item.condition_confidence * 100)}%</Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                        {item.section_key || item.section_url ? (
+                          <div className="text-xs text-muted-foreground">
+                            section: {item.section_label || item.section_key || '—'} • {item.policy_scope || '—'} • {item.section_condition_policy || '—'}
+                          </div>
+                        ) : null}
+                        {item.source_url ? (
+                          <a href={item.source_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline break-all">
+                            {item.source_url}
+                          </a>
+                        ) : null}
+                        {item.payload_excerpt ? (
+                          <div className="text-xs text-muted-foreground line-clamp-3">{item.payload_excerpt}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>

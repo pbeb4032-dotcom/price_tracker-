@@ -59,6 +59,7 @@ import { patchAdminHealthSchema } from '../jobs/patchAdminHealthSchema';
 import { getLatestFxPublications, rolloverLatestFxPublicationToLegacy } from '../fx/governedFx';
 import { certifySources, getRecentSourceCertificationRuns } from '../catalog/sourceCertification';
 import { getRecentSourceSeedImportRuns, importSourceSeeds } from '../catalog/sourceSeedImport';
+import { getListingConditionOverview, getListingConditionQuarantine } from '../catalog/listingConditionOps';
 import {
   DEFAULT_CATEGORY_REGEX,
   DEFAULT_PRODUCT_REGEX,
@@ -1729,6 +1730,146 @@ adminRoutes.get('/source_seed/runs', async (c) => {
   const limit = Math.max(1, Math.min(100, Number(c.req.query('limit') ?? 20)));
   const items = await getRecentSourceSeedImportRuns(gate.db, limit);
   return c.json({ ok: true, items });
+});
+
+const sourceSectionPolicySchema = z.object({
+  source_id: z.string().uuid(),
+  section_key: z.string().min(1),
+  section_label: z.string().nullable().optional(),
+  section_url: z.string().nullable().optional(),
+  policy_scope: z.enum(['allow', 'block']).default('allow'),
+  condition_policy: z.string().min(1).default('new_only'),
+  priority: z.number().int().min(1).max(1000).default(100),
+  is_active: z.boolean().optional(),
+});
+
+adminRoutes.get('/source_section_policies', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const sourceId = String(c.req.query('source_id') ?? '').trim();
+  const limit = Math.max(1, Math.min(500, Number(c.req.query('limit') ?? 200)));
+  if (!sourceId) return c.json({ ok: true, items: [] });
+
+  const rows = await gate.db.execute(sql`
+    select
+      sp.id,
+      sp.source_id,
+      sp.section_key,
+      sp.section_label,
+      sp.section_url,
+      sp.policy_scope,
+      sp.condition_policy,
+      sp.priority,
+      sp.is_active,
+      sp.evidence,
+      sp.created_at,
+      sp.updated_at,
+      ps.name_ar as source_name,
+      ps.domain as source_domain,
+      ps.catalog_condition_policy as source_condition_policy
+    from public.source_section_policies sp
+    join public.price_sources ps on ps.id = sp.source_id
+    where sp.source_id = ${sourceId}::uuid
+    order by sp.is_active desc, sp.priority asc, sp.section_key asc
+    limit ${limit}::int
+  `).catch(() => ({ rows: [] as any[] }));
+
+  return c.json({ ok: true, items: rows.rows ?? [] });
+});
+
+adminRoutes.post('/source_section_policies', async (c) => {
+  const gate = await requireAdmin(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const payload = sourceSectionPolicySchema.parse(await c.req.json());
+
+  const row = await gate.db.execute(sql`
+    insert into public.source_section_policies (
+      source_id,
+      section_key,
+      section_label,
+      section_url,
+      policy_scope,
+      condition_policy,
+      priority,
+      is_active,
+      evidence
+    ) values (
+      ${payload.source_id}::uuid,
+      ${payload.section_key.trim().toLowerCase()},
+      ${payload.section_label?.trim() || null},
+      ${payload.section_url?.trim() || null},
+      ${payload.policy_scope},
+      ${payload.condition_policy.trim().toLowerCase()},
+      ${payload.priority},
+      ${payload.is_active ?? true},
+      ${JSON.stringify({ created_from: 'admin.source_section_policies' })}::jsonb
+    )
+    on conflict (source_id, section_key) do update set
+      section_label = excluded.section_label,
+      section_url = excluded.section_url,
+      policy_scope = excluded.policy_scope,
+      condition_policy = excluded.condition_policy,
+      priority = excluded.priority,
+      is_active = excluded.is_active,
+      evidence = coalesce(public.source_section_policies.evidence, '{}'::jsonb) || excluded.evidence,
+      updated_at = now()
+    returning id
+  `);
+
+  return c.json({ ok: true, id: (row.rows as any[])[0]?.id ?? null });
+});
+
+adminRoutes.patch('/source_section_policies/:id', async (c) => {
+  const gate = await requireAdmin(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const id = String(c.req.param('id') ?? '').trim();
+  const patch = z.record(z.any()).parse(await c.req.json());
+  const allowed = ['section_label', 'section_url', 'policy_scope', 'condition_policy', 'priority', 'is_active'];
+  const entries = Object.entries(patch).filter(([key]) => allowed.includes(key));
+  if (!id || entries.length === 0) return c.json({ ok: true });
+
+  const sets = entries.map(([key, value]) =>
+    key === 'condition_policy'
+      ? sql`${sql.raw(key)} = ${String(value ?? '').trim().toLowerCase()}`
+      : key === 'section_label' || key === 'section_url'
+        ? sql`${sql.raw(key)} = ${String(value ?? '').trim() || null}`
+        : sql`${sql.raw(key)} = ${value}`,
+  );
+
+  await gate.db.execute(sql`
+    update public.source_section_policies
+    set ${sql.join(sets, sql`, `)}, updated_at = now()
+    where id = ${id}::uuid
+  `);
+
+  return c.json({ ok: true });
+});
+
+adminRoutes.get('/listing_condition/overview', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const hours = Number(c.req.query('hours') ?? 72);
+  const limitSources = Number(c.req.query('limit_sources') ?? 30);
+  const result = await getListingConditionOverview(gate.db, { hours, limitSources });
+  return c.json(result);
+});
+
+adminRoutes.get('/listing_condition/quarantine', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const hours = Number(c.req.query('hours') ?? 72);
+  const limit = Number(c.req.query('limit') ?? 50);
+  const sourceId = c.req.query('source_id') ?? null;
+  const sourceDomain = c.req.query('source_domain') ?? null;
+  const reason = c.req.query('reason') ?? null;
+  const result = await getListingConditionQuarantine(gate.db, {
+    hours,
+    limit,
+    sourceId,
+    sourceDomain,
+    reason,
+  });
+  return c.json(result);
 });
 
 adminRoutes.post('/jobs/certify_sources', async (c) => {
