@@ -37,8 +37,16 @@ Admin login:
 ## First Run
 
 1. Open `/admin`
-2. Install the large Iraq source pack
-3. Run the full pipeline: seed, APIs, ingest, and images
+2. Install `iraq-trusted-core-v1`
+3. Set `Pack pilot scope`
+4. Run the governed pilot flow:
+   - `Validate Candidates`
+   - `Activate Passed`
+   - `Certification Dry-Run`
+   - `Seed Scoped Pilot`
+   - `Ingest Scoped Pilot`
+
+Use [docs/iraq-trusted-core-v1-pilot-runbook.md](docs/iraq-trusted-core-v1-pilot-runbook.md) as the canonical checklist for Pilot 01.
 
 ## Repository Layout
 

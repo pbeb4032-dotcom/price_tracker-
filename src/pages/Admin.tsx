@@ -2698,6 +2698,34 @@ const recomputeTrust = useMutation({
                       <div className="text-xs text-muted-foreground">
                         ملاحظة: الاكتشاف يعتمد على SearxNG داخل Docker (بدون مفاتيح API). إذا تريد Target 1000 غيّر الرقم وكرر.
                       </div>
+                      <div className="rounded-lg border p-3 text-sm">
+                        <div className="font-medium">Pilot 01 Checklist</div>
+                        <div className="mt-2 text-muted-foreground">
+                          Install pack → Validate → Activate → Certification Dry-Run → Seed Scoped Pilot → Ingest Scoped Pilot → Review.
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">
+                          <div className="rounded-md bg-muted/50 p-3">
+                            <div className="text-xs font-medium text-foreground">كمل إذا</div>
+                            <ul className="mt-2 list-disc space-y-1 pr-4 text-xs text-muted-foreground">
+                              <li>trusted sources تعدّي validation بشكل منطقي</li>
+                              <li>mixed sources تبقى تحت السيطرة</li>
+                              <li>condition gate يمنع used/open-box</li>
+                              <li>taxonomy quarantine تبقى ضمن الطبيعي</li>
+                              <li>Adapter Execution Queue يقدّم API و HTML أولًا</li>
+                            </ul>
+                          </div>
+                          <div className="rounded-md border border-red-200 bg-red-50/60 p-3 dark:border-red-900 dark:bg-red-950/20">
+                            <div className="text-xs font-medium text-red-700 dark:text-red-300">وقف إذا</div>
+                            <ul className="mt-2 list-disc space-y-1 pr-4 text-xs text-red-700/90 dark:text-red-300/90">
+                              <li>used listings تدخل approved</li>
+                              <li>mixed source تتصرف كأنها clean retail</li>
+                              <li>unknown rate ينفجر على new-only sources</li>
+                              <li>taxonomy conflicts تخرب branch كامل</li>
+                              <li>execution queue يرفع sources ضعيفة فوق القوية</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
 
