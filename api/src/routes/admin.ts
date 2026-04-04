@@ -163,6 +163,23 @@ function normalizeDomain(input: string): string {
     .replace(/\/$/, '');
 }
 
+function normalizeDomainList(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[,\n\r\t ]+/g)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = normalizeDomain(String(item ?? '')).replace(/^www\./, '').replace(/\/.*$/, '');
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
+
 function normalizeUrl(input: string): { url: string; domain: string } {
   const raw = String(input ?? '').trim();
   if (!raw) return { url: '', domain: '' };
@@ -1602,7 +1619,8 @@ adminRoutes.post('/jobs/seed', async (c) => {
   // Higher defaults to support real coverage. These are per-run budgets.
   const maxUrls = Number((body as any).limit ?? 20000);
   const sitemapMaxPerDomain = Number((body as any).sitemapMaxPerDomain ?? 20000);
-  const result = await seedCrawlFrontier(c.env, { maxUrls, sitemapMaxPerDomain });
+  const domains = normalizeDomainList((body as any).domains ?? ((body as any).domain ? [String((body as any).domain)] : []));
+  const result = await seedCrawlFrontier(c.env, { maxUrls, sitemapMaxPerDomain, domains });
   return c.json({ ok: true, job: 'seed', result });
 });
 
@@ -1623,7 +1641,8 @@ adminRoutes.post('/jobs/ingest', async (c) => {
   const limit = Number((body as any).limit ?? 200);
   const concurrency = Number((body as any).concurrency ?? 16);
   const perDomain = Number((body as any).perDomain ?? 40);
-  const result = await ingestProductPages(c.env, { limit, concurrency, perDomain });
+  const domains = normalizeDomainList((body as any).domains ?? ((body as any).domain ? [String((body as any).domain)] : []));
+  const result = await ingestProductPages(c.env, { limit, concurrency, perDomain, domains });
   return c.json({ ok: true, job: 'ingest', result });
 });
 

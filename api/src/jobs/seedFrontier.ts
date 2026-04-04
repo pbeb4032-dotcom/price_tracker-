@@ -16,10 +16,38 @@ const DEFAULT_CATEGORY_RE = /\/(category|categories|collections|shop|store|depar
 
 type DomainRule = { product: RegExp; category: RegExp };
 
-export async function seedCrawlFrontier(env: Env, opts?: { maxUrls?: number; sitemapMaxPerDomain?: number }): Promise<any> {
+function normalizeScopedDomain(input: string): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/\/$/, '');
+}
+
+function normalizeScopedDomains(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[,\n\r\t ]+/g)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = normalizeScopedDomain(String(item ?? ''));
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
+
+export async function seedCrawlFrontier(env: Env, opts?: { maxUrls?: number; sitemapMaxPerDomain?: number; domains?: string[] }): Promise<any> {
   const db = getDb(env);
   const maxUrls = Math.max(100, Math.min(200000, Number(opts?.maxUrls ?? MAX_URLS_PER_RUN)));
   const maxPerDomain = Math.max(50, Math.min(200000, Number(opts?.sitemapMaxPerDomain ?? SITEMAP_MAX_URLS_PER_DOMAIN)));
+  const requestedDomains = normalizeScopedDomains(opts?.domains ?? []);
 
   // 1) Domain patterns
   const patterns = await db.execute(sql`select domain, product_regex, category_regex from public.domain_url_patterns`);
@@ -44,8 +72,19 @@ export async function seedCrawlFrontier(env: Env, opts?: { maxUrls?: number; sit
       and coalesce(crawl_enabled,true) = true
       and coalesce(lifecycle_status,'active') in ('active','candidate')
   `);
-  const activeDomains = (sources.rows as any[]).map((s) => String(s.domain));
-  if (!activeDomains.length) return { seeded_total: 0, message: 'No active sources' };
+  const allActiveDomains = (sources.rows as any[]).map((s) => String(s.domain));
+  const activeDomains = requestedDomains.length
+    ? allActiveDomains.filter((domain) => requestedDomains.includes(domain))
+    : allActiveDomains;
+  if (!activeDomains.length) {
+    return {
+      seeded_total: 0,
+      message: requestedDomains.length ? 'No matching active sources for requested domains' : 'No active sources',
+      requested_domains: requestedDomains,
+      scoped_domains: activeDomains,
+      active_domains: allActiveDomains.length,
+    };
+  }
 
   let totalInserted = 0;
   const seededByDomain: Record<string, number> = {};
@@ -185,6 +224,8 @@ export async function seedCrawlFrontier(env: Env, opts?: { maxUrls?: number; sit
     seeded_by_domain: seededByDomain,
     skipped_duplicates: skippedDuplicates,
     active_domains: activeDomains.length,
+    requested_domains: requestedDomains,
+    scoped_domains: activeDomains,
   };
 }
 

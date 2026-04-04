@@ -54,6 +54,33 @@ type ErrorCode =
 
 type EvidenceType = 'url' | 'screenshot' | 'api' | 'ai_scrape';
 
+function normalizeScopedDomain(input: string): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/\/$/, '');
+}
+
+function normalizeScopedDomains(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[,\n\r\t ]+/g)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const domain = normalizeScopedDomain(String(item ?? ''));
+    if (!domain || seen.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
+  }
+  return out;
+}
+
 type FetchResult = {
   status: number;
   html: string | null;
@@ -317,7 +344,7 @@ function shouldUpgradeCategory(existing: string | null | undefined, nextCat: str
   return false; // no downgrade
 }
 
-export async function ingestProductPages(env: Env, opts?: { limit?: number; concurrency?: number; perDomain?: number }): Promise<any> {
+export async function ingestProductPages(env: Env, opts?: { limit?: number; concurrency?: number; perDomain?: number; domains?: string[] }): Promise<any> {
   const db = getDb(env);
 
   const owner = crypto.randomUUID();
@@ -353,16 +380,37 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
 
     const limit = Math.max(1, Math.min(4000, Number(opts?.limit ?? BATCH_SIZE)));
     const perDomain = Math.max(1, Math.min(200, Number((opts as any)?.perDomain ?? 40)));
+    const requestedDomains = normalizeScopedDomains(opts?.domains ?? []);
+    let excludedDomains: string[] = [];
+    if (requestedDomains.length) {
+      const frontierDomains = await db.execute(sql`
+        select distinct source_domain
+        from public.crawl_frontier
+        where status = 'pending'
+      `).catch(() => ({ rows: [] as any[] }));
+      const pendingDomains = ((frontierDomains.rows as any[]) ?? [])
+        .map((row) => normalizeScopedDomain(String(row.source_domain ?? '')))
+        .filter(Boolean);
+      excludedDomains = [...new Set(pendingDomains.filter((domain) => !requestedDomains.includes(domain)))];
+    }
     const claimed = await db.execute(sql`
       select *
-      from public.claim_crawl_frontier_batch(${limit}::int, '{}'::text[], ${perDomain}::int)
+      from public.claim_crawl_frontier_batch(${limit}::int, ${JSON.stringify(excludedDomains)}::text[], ${perDomain}::int)
     `);
     const items = (claimed.rows as any[]) ?? [];
     const sourceConditionCache = new Map<string, Awaited<ReturnType<typeof loadSourceConditionContext>>>();
 
     if (!items.length) {
       await finalizeRun(db, runId, processed, succeeded, failed, { notes: 'no_pending_items' });
-      return { processed, succeeded, failed, links_discovered: 0, error_counts: errorCounts };
+      return {
+        processed,
+        succeeded,
+        failed,
+        links_discovered: 0,
+        error_counts: errorCounts,
+        requested_domains: requestedDomains,
+        excluded_domains: excludedDomains,
+      };
     }
 
     // Domain health blocks (auto-disabled, backoff, budgets).
@@ -1268,11 +1316,25 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
 
 
     await finalizeRun(db, runId, processed, succeeded, failed, { notes: `links_discovered=${linksDiscovered}` });
-    return { processed, succeeded, failed, links_discovered: linksDiscovered, error_counts: errorCounts };
+    return {
+      processed,
+      succeeded,
+      failed,
+      links_discovered: linksDiscovered,
+      error_counts: errorCounts,
+      requested_domains: requestedDomains,
+      excluded_domains: excludedDomains,
+    };
 
   } catch (err: any) {
     await finalizeRun(db, runId, processed, succeeded, failed, { status: 'failed', notes: String(err?.message ?? err).slice(0, 300) });
-    return { processed, succeeded, failed, error: String(err?.message ?? err) };
+    return {
+      processed,
+      succeeded,
+      failed,
+      error: String(err?.message ?? err),
+      requested_domains: normalizeScopedDomains(opts?.domains ?? []),
+    };
   } finally {
     try { await db.execute(sql`select public.release_ingest_mutex(${LOCK_NAME}, ${owner})`); } catch {}
   }
