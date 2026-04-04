@@ -1,0 +1,699 @@
+{
+  "id": "iraq-trusted-core-v1",
+  "name_ar": "حزمة العراق الموثوقة الأساسية v1 (19 مصدر)",
+  "description_ar": "حزمة مبحوثة يدويًا للمصادر العراقية القوية: سوبر-آبس + متاجر إلكترونية + متاجر رسمية + صيدليات. تركيزها على المصادر الجديدة والموثوقة، مع mixed-source governance للمصادر التي تحتاج allowlists.",
+  "version": "1.0",
+  "generated_at": "2026-04-04T15:30:00Z",
+  "curation_policy": {
+    "verified_at": "2026-04-04",
+    "include_only": [
+      "official stores",
+      "large retailers",
+      "trusted marketplaces",
+      "reliable grocery/super apps with product/retail signals"
+    ],
+    "exclude_by_default": [
+      "used-first classifieds",
+      "unverified social pages",
+      "unclear domains",
+      "sources without clean new-product evidence"
+    ]
+  },
+  "plugins": [
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "iraq.talabat.com",
+        "name_ar": "طلبات العراق",
+        "source_kind": "marketplace",
+        "trust_weight": 0.82,
+        "base_url": "https://iraq.talabat.com",
+        "logo_url": null,
+        "source_channel": "grocery_app",
+        "adapter_strategy": "mobile_api",
+        "catalog_condition_policy": "mixed",
+        "condition_confidence": 0.82,
+        "source_priority": 25,
+        "sectors": ["grocery", "pharmacy", "convenience", "retail"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "iraq.talabat.com",
+        "product_regex": "\\/(product|products|p|item|dp|store|shop)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store|department|c|offers|groceries|pharmacy)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://iraq.talabat.com/ar",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": [],
+      "section_policies": [
+        { "section_key": "grocery", "section_label": "Groceries", "policy_scope": "allow", "condition_policy": "new_only", "priority": 10 },
+        { "section_key": "pharmacy", "section_label": "Pharmacy", "policy_scope": "allow", "condition_policy": "new_only", "priority": 20 },
+        { "section_key": "health beauty", "section_label": "Health & Beauty", "policy_scope": "allow", "condition_policy": "new_only", "priority": 25 },
+        { "section_key": "restaurant", "section_label": "Restaurants", "policy_scope": "block", "condition_policy": "mixed", "priority": 5 },
+        { "section_key": "food delivery", "section_label": "Food Delivery", "policy_scope": "block", "condition_policy": "mixed", "priority": 6 }
+      ]
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "totersapp.com",
+        "name_ar": "توترز",
+        "source_kind": "marketplace",
+        "trust_weight": 0.84,
+        "base_url": "https://www.totersapp.com",
+        "logo_url": null,
+        "source_channel": "grocery_app",
+        "adapter_strategy": "mobile_api",
+        "catalog_condition_policy": "mixed",
+        "condition_confidence": 0.84,
+        "source_priority": 25,
+        "sectors": ["grocery", "pharmacy", "electronics", "retail"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "totersapp.com",
+        "product_regex": "\\/(product|products|p|item|store|shop)\\/",
+        "category_regex": "\\/(category|categories|shop|stores|groceries|pharmacy|electronics)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.totersapp.com/",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": [],
+      "section_policies": [
+        { "section_key": "grocery", "section_label": "Groceries", "policy_scope": "allow", "condition_policy": "new_only", "priority": 10 },
+        { "section_key": "pharmacy", "section_label": "Pharmacy", "policy_scope": "allow", "condition_policy": "new_only", "priority": 20 },
+        { "section_key": "electronics", "section_label": "Electronics", "policy_scope": "allow", "condition_policy": "new_only", "priority": 30 },
+        { "section_key": "restaurant", "section_label": "Restaurants", "policy_scope": "block", "condition_policy": "mixed", "priority": 5 },
+        { "section_key": "food", "section_label": "Food", "policy_scope": "block", "condition_policy": "mixed", "priority": 6 }
+      ]
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "lezzoo.com",
+        "name_ar": "لززو",
+        "source_kind": "marketplace",
+        "trust_weight": 0.8,
+        "base_url": "https://lezzoo.com",
+        "logo_url": null,
+        "source_channel": "grocery_app",
+        "adapter_strategy": "hybrid",
+        "catalog_condition_policy": "mixed",
+        "condition_confidence": 0.82,
+        "source_priority": 30,
+        "sectors": ["grocery", "pharmacy", "retail", "ecommerce"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "lezzoo.com",
+        "product_regex": "\\/(product|products|store|shop|marketplace|category)\\/",
+        "category_regex": "\\/(category|categories|shop|marketplace|groceries|pharmacy|e-commerce)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://lezzoo.com/",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": [],
+      "section_policies": [
+        { "section_key": "groceries", "section_label": "Groceries", "policy_scope": "allow", "condition_policy": "new_only", "priority": 10 },
+        { "section_key": "pharmacy", "section_label": "Pharmacy", "policy_scope": "allow", "condition_policy": "new_only", "priority": 20 },
+        { "section_key": "e-commerce", "section_label": "E-commerce", "policy_scope": "allow", "condition_policy": "new_only", "priority": 30 },
+        { "section_key": "food delivery", "section_label": "Food Delivery", "policy_scope": "block", "condition_policy": "mixed", "priority": 5 },
+        { "section_key": "services", "section_label": "Services", "policy_scope": "block", "condition_policy": "mixed", "priority": 6 },
+        { "section_key": "express", "section_label": "Express", "policy_scope": "block", "condition_policy": "mixed", "priority": 7 }
+      ]
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "gini.iq",
+        "name_ar": "جني / سوق جني",
+        "source_kind": "marketplace",
+        "trust_weight": 0.76,
+        "base_url": "https://gini.iq",
+        "logo_url": null,
+        "source_channel": "marketplace",
+        "adapter_strategy": "hybrid",
+        "catalog_condition_policy": "mixed",
+        "condition_confidence": 0.8,
+        "source_priority": 35,
+        "sectors": ["marketplace", "general", "electronics", "fashion", "beauty"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "gini.iq",
+        "product_regex": "\\/(product|products|store|shop|market|souk)\\/",
+        "category_regex": "\\/(category|categories|stores|shop|market|souk|trade)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://gini.iq/",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": [],
+      "section_policies": [
+        { "section_key": "سوق جني", "section_label": "سوق جني", "policy_scope": "allow", "condition_policy": "new_only", "priority": 10 },
+        { "section_key": "souq gini", "section_label": "Souq Gini", "policy_scope": "allow", "condition_policy": "new_only", "priority": 11 },
+        { "section_key": "سوق الجمعة", "section_label": "سوق الجمعة", "policy_scope": "block", "condition_policy": "mixed", "priority": 5 },
+        { "section_key": "souq jomaa", "section_label": "Souq Jomaa", "policy_scope": "block", "condition_policy": "mixed", "priority": 6 },
+        { "section_key": "سيارات", "section_label": "Cars", "policy_scope": "block", "condition_policy": "mixed", "priority": 7 }
+      ]
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "simma.io",
+        "name_ar": "سِما",
+        "source_kind": "marketplace",
+        "trust_weight": 0.76,
+        "base_url": "https://www.simma.io",
+        "logo_url": null,
+        "source_channel": "aggregator",
+        "adapter_strategy": "rendered_html",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.9,
+        "source_priority": 45,
+        "sectors": ["fashion", "sports", "electronics", "beauty"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "simma.io",
+        "product_regex": "\\/(product|products|stores|item|brand)\\/",
+        "category_regex": "\\/(categories|category|stores|brands)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.simma.io/ar",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "miswag.com",
+        "name_ar": "مسواگ",
+        "source_kind": "retailer",
+        "trust_weight": 0.84,
+        "base_url": "https://miswag.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.92,
+        "source_priority": 40,
+        "sectors": ["general", "electronics", "home", "beauty"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "miswag.com",
+        "product_regex": "\\/(product|products|brand|item|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|brand|offers)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://miswag.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "orisdi.com",
+        "name_ar": "أورزدي",
+        "source_kind": "marketplace",
+        "trust_weight": 0.74,
+        "base_url": "https://orisdi.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.86,
+        "source_priority": 55,
+        "sectors": ["beauty", "fragrance", "general"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "orisdi.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|brands|offers)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://orisdi.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "jum3a.com",
+        "name_ar": "جمعة",
+        "source_kind": "retailer",
+        "trust_weight": 0.82,
+        "base_url": "https://jum3a.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.92,
+        "source_priority": 45,
+        "sectors": ["general", "home", "electronics", "beauty"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "jum3a.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|offers)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://jum3a.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "bazzaar.com",
+        "name_ar": "بازار",
+        "source_kind": "marketplace",
+        "trust_weight": 0.75,
+        "base_url": "https://bazzaar.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "rendered_html",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.86,
+        "source_priority": 50,
+        "sectors": ["general", "electronics", "home", "beauty"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "bazzaar.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|offers|brands)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://bazzaar.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "ishtariiraq.com",
+        "name_ar": "اشتري العراق",
+        "source_kind": "retailer",
+        "trust_weight": 0.74,
+        "base_url": "https://ishtariiraq.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.9,
+        "source_priority": 65,
+        "sectors": ["general", "gadgets", "home", "beauty"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "ishtariiraq.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|store|offers)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://ishtariiraq.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "toolmart.me",
+        "name_ar": "تول مارت",
+        "source_kind": "retailer",
+        "trust_weight": 0.8,
+        "base_url": "https://toolmart.me",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.92,
+        "source_priority": 70,
+        "sectors": ["tools", "b2b", "industrial", "office"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "toolmart.me",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://toolmart.me",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "ftp.elryan.com",
+        "name_ar": "الريان",
+        "source_kind": "retailer",
+        "trust_weight": 0.82,
+        "base_url": "https://ftp.elryan.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.9,
+        "source_priority": 55,
+        "sectors": ["electronics", "home_appliances", "beauty"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "ftp.elryan.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|store|offers)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://ftp.elryan.com/en",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "alhafidh.com",
+        "name_ar": "الحافظ",
+        "source_kind": "official",
+        "trust_weight": 0.88,
+        "base_url": "https://alhafidh.com",
+        "logo_url": null,
+        "source_channel": "brand_store",
+        "adapter_strategy": "rendered_html",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.95,
+        "source_priority": 50,
+        "sectors": ["home_appliances", "electronics"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "alhafidh.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|store|offers|brands)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://alhafidh.com/en/",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "store.alnabaa.com",
+        "name_ar": "النبأ ستور",
+        "source_kind": "retailer",
+        "trust_weight": 0.78,
+        "base_url": "https://store.alnabaa.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.88,
+        "source_priority": 65,
+        "sectors": ["electronics", "home_appliances"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "store.alnabaa.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://store.alnabaa.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "istyle.iq",
+        "name_ar": "آي ستايل العراق",
+        "source_kind": "official",
+        "trust_weight": 0.9,
+        "base_url": "https://istyle.iq",
+        "logo_url": null,
+        "source_channel": "brand_store",
+        "adapter_strategy": "rendered_html",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.95,
+        "source_priority": 60,
+        "sectors": ["electronics", "apple", "accessories"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "istyle.iq",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|store|offers|collection)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://istyle.iq",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "thebodyshop.iq",
+        "name_ar": "ذا بودي شوب العراق",
+        "source_kind": "official",
+        "trust_weight": 0.88,
+        "base_url": "https://www.thebodyshop.iq",
+        "logo_url": null,
+        "source_channel": "brand_store",
+        "adapter_strategy": "rendered_html",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.94,
+        "source_priority": 70,
+        "sectors": ["beauty", "personal_care"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "thebodyshop.iq",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|store|offers|collection)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://www.thebodyshop.iq/ar",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "alshaheera.com",
+        "name_ar": "الشهيرة",
+        "source_kind": "retailer",
+        "trust_weight": 0.84,
+        "base_url": "https://alshaheera.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "rendered_html",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.92,
+        "source_priority": 65,
+        "sectors": ["beauty", "fragrance", "personal_care"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "alshaheera.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|store|offers|brands)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://alshaheera.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "saharpharmacyonline.com",
+        "name_ar": "صيدلية سحر أونلاين",
+        "source_kind": "retailer",
+        "trust_weight": 0.83,
+        "base_url": "https://saharpharmacyonline.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "html_sitemap",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.94,
+        "source_priority": 60,
+        "sectors": ["pharmacy", "health", "personal_care", "baby"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "saharpharmacyonline.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|collections|shop|store)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://saharpharmacyonline.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    },
+    {
+      "version": "1.0",
+      "source": {
+        "domain": "iraq.feel22.com",
+        "name_ar": "feel22 العراق",
+        "source_kind": "marketplace",
+        "trust_weight": 0.72,
+        "base_url": "https://iraq.feel22.com",
+        "logo_url": null,
+        "source_channel": "website",
+        "adapter_strategy": "rendered_html",
+        "catalog_condition_policy": "new_only",
+        "condition_confidence": 0.84,
+        "source_priority": 68,
+        "sectors": ["beauty", "personal_care", "fragrance"],
+        "provinces": []
+      },
+      "patterns": {
+        "domain": "iraq.feel22.com",
+        "product_regex": "\\/(product|products|item|sku)\\/",
+        "category_regex": "\\/(category|categories|shop|store|brands|offers)\\/"
+      },
+      "entrypoints": [
+        {
+          "url": "https://iraq.feel22.com",
+          "page_type": "category",
+          "priority": 20,
+          "is_active": true
+        }
+      ],
+      "adapters": [],
+      "api_endpoints": [],
+      "bootstrap_paths": []
+    }
+  ]
+}

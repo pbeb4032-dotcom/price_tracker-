@@ -1,33 +1,33 @@
 {
   "version": "1.0",
-  "generated_at": "2026-02-22T15:26:22Z",
+  "generated_at": "2026-04-04T15:35:00Z",
   "packs": [
+    {
+      "id": "iraq-trusted-core-v1",
+      "name_ar": "حزمة العراق الموثوقة الأساسية v1 (19 مصدر)",
+      "description_ar": "حزمة production-first مبحوثة يدويًا: سوبر-آبس موثوقة + متاجر رسمية + متاجر إلكترونية + صيدليات، مع governance للمصادر المختلطة مثل Talabat وToters وLezzoo وGini.",
+      "file": "iraq-trusted-core-v1.json",
+      "count": 19,
+      "recommended": true,
+      "tags": ["العراق", "موثوقة", "production", "new-only", "mixed-governed"]
+    },
     {
       "id": "iraq-mega-55",
       "name_ar": "حزمة العراق الكبرى (55 مصدر)",
-      "description_ar": "مقترحة كبداية: متاجر + ماركات + منصات داخل العراق. (آمنة ومناسبة للـ Sitemap + JSON-LD/NextData بدون Headless).",
+      "description_ar": "حزمة أوسع من الجيل القديم، مناسبة كبداية broad coverage لكنها أقل صرامة من الحزمة الموثوقة الجديدة.",
       "file": "iraq-mega-55.json",
       "count": 55,
-      "recommended": true,
-      "tags": [
-        "العراق",
-        "متاجر",
-        "Sitemap",
-        "JSON-LD"
-      ]
+      "recommended": false,
+      "tags": ["العراق", "متاجر", "sitemap", "json-ld"]
     },
     {
       "id": "iraq-all-60",
       "name_ar": "حزمة العراق الشاملة (60 مصدر)",
-      "description_ar": "أوسع من الكبرى وتضيف مصادر إضافية (قد تكون خدمات/مؤسسات). استخدمها إذا تريد Coverage أوسع.",
+      "description_ar": "أوسع تغطية من الحزمة الكبرى وتضم مصادر إضافية، لكنها ليست الحزمة الأولى المقترحة للـ production pilot.",
       "file": "iraq-all-60.json",
       "count": 60,
       "recommended": false,
-      "tags": [
-        "العراق",
-        "شاملة",
-        "تنوع"
-      ]
+      "tags": ["العراق", "شاملة", "تنوع"]
     }
   ]
 }

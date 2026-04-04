@@ -65,6 +65,7 @@ import {
   DEFAULT_PRODUCT_REGEX,
   ensureBaselineSourceAdapter,
   ensureSourceScaffold,
+  normalizeCatalogConditionPolicy,
   normalizeSourceBaseUrl,
   normalizeSourceDomain,
   upsertGovernedSourceProfile,
@@ -81,6 +82,59 @@ type AdminGate = {
   res: Response | null;
   internal?: boolean;
 };
+
+type SitePluginSectionPolicy = {
+  section_key: string;
+  section_label: string | null;
+  section_url: string | null;
+  policy_scope: 'allow' | 'block';
+  condition_policy: 'new_only' | 'mixed' | 'unknown';
+  priority: number;
+  is_active: boolean;
+};
+
+function deriveSitePluginSectionKey(input: any, index: number): string {
+  const rawKey = String(input?.section_key ?? input?.sectionKey ?? '').trim();
+  if (rawKey) return rawKey.toLowerCase().replace(/\s+/g, '_');
+
+  const rawUrl = String(input?.section_url ?? input?.sectionUrl ?? '').trim();
+  if (rawUrl) {
+    try {
+      const parsed = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://section.local${rawUrl}`);
+      const derived = `${parsed.hostname}${parsed.pathname}`.replace(/^section\.local/, '').trim();
+      if (derived) return derived.toLowerCase().replace(/[^\p{L}\p{N}\/_-]+/gu, '_');
+    } catch {
+      // fall through
+    }
+  }
+
+  const rawLabel = String(input?.section_label ?? input?.sectionLabel ?? '').trim();
+  if (rawLabel) return rawLabel.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '_');
+
+  return `section_${index + 1}`;
+}
+
+function normalizeSitePluginSectionPolicies(input: unknown): SitePluginSectionPolicy[] {
+  if (!Array.isArray(input)) return [];
+  const out: SitePluginSectionPolicy[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < input.length; index += 1) {
+    const row = (input[index] ?? {}) as any;
+    const sectionKey = deriveSitePluginSectionKey(row, index);
+    if (!sectionKey || seen.has(sectionKey)) continue;
+    seen.add(sectionKey);
+    out.push({
+      section_key: sectionKey,
+      section_label: row.section_label ? String(row.section_label).trim() : row.sectionLabel ? String(row.sectionLabel).trim() : null,
+      section_url: row.section_url ? String(row.section_url).trim() : row.sectionUrl ? String(row.sectionUrl).trim() : null,
+      policy_scope: String(row.policy_scope ?? row.policyScope ?? 'allow').trim().toLowerCase() === 'block' ? 'block' : 'allow',
+      condition_policy: normalizeCatalogConditionPolicy(row.condition_policy ?? row.conditionPolicy ?? 'new_only'),
+      priority: Math.max(1, Math.min(1000, Math.trunc(Number(row.priority ?? 100)))),
+      is_active: row.is_active !== false && row.isActive !== false,
+    });
+  }
+  return out;
+}
 
 async function requireAdmin(c: any): Promise<AdminGate> {
   const auth = c.get('auth') as AppAuthContext | null;
@@ -2610,10 +2664,31 @@ adminRoutes.post('/site_plugins/export', async (c) => {
     order by priority asc
   `);
 
+  const sectionPolicies = await db.execute(sql`
+    select
+      id,
+      section_key,
+      section_label,
+      section_url,
+      policy_scope,
+      condition_policy,
+      priority,
+      is_active
+    from public.source_section_policies
+    where source_id = ${String(src.id)}::uuid
+    order by priority asc, section_key asc
+  `).catch(() => ({ rows: [] as any[] }));
+
+  const sourceDiscoveryTags = src?.discovery_tags && typeof src.discovery_tags === 'object' ? src.discovery_tags : {};
+
   const plugin = {
     version: '1.0',
     exported_at: new Date().toISOString(),
-    source: src,
+    source: {
+      ...src,
+      sectors: Array.isArray((sourceDiscoveryTags as any).sectors) ? (sourceDiscoveryTags as any).sectors : [],
+      provinces: Array.isArray((sourceDiscoveryTags as any).provinces) ? (sourceDiscoveryTags as any).provinces : [],
+    },
     patterns: (patterns.rows as any[])[0] ?? {
       domain,
       product_regex: String.raw`\/(product|products|p|item|dp)\/`,
@@ -2623,6 +2698,7 @@ adminRoutes.post('/site_plugins/export', async (c) => {
     adapters: adapters.rows ?? [],
     api_endpoints: apiEndpoints.rows ?? [],
     bootstrap_paths: bootstrap.rows ?? [],
+    section_policies: sectionPolicies.rows ?? [],
   };
 
   return c.json({ success: true, plugin });
@@ -2694,6 +2770,7 @@ adminRoutes.post('/site_plugins/import', async (c) => {
     await db.execute(sql`delete from public.source_adapters where source_id=${sourceId}::uuid`);
     await db.execute(sql`delete from public.source_api_endpoints where domain=${domain}`);
     await db.execute(sql`delete from public.domain_bootstrap_paths where source_domain=${domain}`);
+    await db.execute(sql`delete from public.source_section_policies where source_id=${sourceId}::uuid`).catch(() => {});
   }
 
   const entrypoints = Array.isArray(plugin.entrypoints) ? plugin.entrypoints : [];
@@ -2799,6 +2876,57 @@ adminRoutes.post('/site_plugins/import', async (c) => {
           is_active = excluded.is_active,
           updated_at = now()
       `);
+    }
+  }
+
+  const rawSectionPolicies = Array.isArray(plugin.section_policies)
+    ? plugin.section_policies
+    : Array.isArray(plugin.source?.section_policies)
+      ? plugin.source.section_policies
+      : Array.isArray(plugin.source?.section_allowlists)
+        ? plugin.source.section_allowlists
+        : [];
+  const sectionPolicies = normalizeSitePluginSectionPolicies(rawSectionPolicies);
+  if (sectionPolicies.length) {
+    const importedAt = new Date().toISOString();
+    for (const policy of sectionPolicies) {
+      await db.execute(sql`
+        insert into public.source_section_policies (
+          source_id,
+          section_key,
+          section_label,
+          section_url,
+          policy_scope,
+          condition_policy,
+          priority,
+          is_active,
+          evidence
+        )
+        values (
+          ${sourceId}::uuid,
+          ${policy.section_key},
+          ${policy.section_label},
+          ${policy.section_url},
+          ${policy.policy_scope},
+          ${policy.condition_policy},
+          ${policy.priority},
+          ${policy.is_active},
+          ${JSON.stringify({
+            imported_from_plugin: true,
+            imported_at: importedAt,
+            mode,
+          })}::jsonb
+        )
+        on conflict (source_id, section_key) do update set
+          section_label = excluded.section_label,
+          section_url = excluded.section_url,
+          policy_scope = excluded.policy_scope,
+          condition_policy = excluded.condition_policy,
+          priority = excluded.priority,
+          is_active = excluded.is_active,
+          evidence = coalesce(public.source_section_policies.evidence, '{}'::jsonb) || excluded.evidence,
+          updated_at = now()
+      `).catch(() => {});
     }
   }
 
