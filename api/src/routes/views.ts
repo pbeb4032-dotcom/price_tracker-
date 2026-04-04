@@ -5,6 +5,7 @@ import type { AppAuthContext } from '../auth/appUser';
 import { inferCategoryKeyDetailed } from '../ingestion/categoryInfer';
 import { buildNameSearchTokens, fetchOpenFoodFactsProduct, inferIdentifierType, normalizeIdentifierValue, normalizeSearchText } from '../catalog/identifierResolver';
 import { parseBarcodeInput, resolveBarcodeLookup } from '../catalog/barcodeResolution';
+import { pickOfferDelivery as rankDelivery, pickOfferPrice as rankPrice, rankOfferRow, rankOfferRows, scoreProductRow } from '../catalog/offerRanking';
 
 type Ctx = { Bindings: Env; Variables: { auth: AppAuthContext | null } };
 
@@ -231,20 +232,9 @@ function summariseExternalCheapest(offers: Record<string, unknown>[]) {
   };
 }
 
-const pickPrice = (row: Record<string, unknown>): number | null => {
-  return (
-    asNum(row.final_price) ??
-    asNum(row.display_price_iqd) ??
-    asNum(row.current_price) ??
-    asNum(row.price_iqd) ??
-    asNum(row.price) ??
-    null
-  );
-};
+const pickPrice = rankPrice;
 
-const pickDelivery = (row: Record<string, unknown>): number => {
-  return asNum(row.delivery_fee_iqd) ?? asNum(row.delivery_fee) ?? 0;
-};
+const pickDelivery = rankDelivery;
 
 const pickTrust = (row: Record<string, unknown>): number => {
   const direct = asNum(row.trust_score) ?? asNum(row.confidence_score) ?? asNum(row.match_confidence);
@@ -657,6 +647,7 @@ viewRoutes.get('/best_offers', async (c) => {
   // This was a major source of cross-category pollution in Explore.
   // Opt-in only for legacy/dev comparisons.
   const includeGeneralBackfill = ['1', 'true', 'yes'].includes(String(c.req.query('include_general_backfill') ?? '').toLowerCase());
+  const includeUnpublished = ['1', 'true', 'yes'].includes(String(c.req.query('include_unpublished') ?? '').toLowerCase());
 
   const db = getDb(c.env);
 
@@ -682,6 +673,7 @@ const execBestOffers = async (uiQuery: any, fallbackQuery: any) => {
   if (category && category !== 'all') conds.push(sql`v.category = ${category}`);
   if (subcategory && subcategory !== 'all') conds.push(sql`v.subcategory = ${subcategory}`);
   if (regionId) conds.push(sql`v.region_id = ${regionId}`);
+  if (!includeUnpublished) conds.push(sql`coalesce(ps.catalog_publish_enabled, true) = true`);
 
   if (q) {
     const like = `%${q}%`;
@@ -716,6 +708,7 @@ const execBestOffers = async (uiQuery: any, fallbackQuery: any) => {
   }
 
   const where = conds.length ? sql`where ${sql.join(conds, sql` and `)}` : sql``;
+  const prefetchLimit = Math.min(Math.max(limit * 4, limit), 800);
 
 let totalCount: number | null = null;
 if (includeTotal) {
@@ -723,11 +716,13 @@ if (includeTotal) {
     sql`
       select count(*)::bigint as total
       from public.v_best_offers_ui v
+      join public.price_sources ps on ps.id = v.source_id
       ${where}
     `,
     sql`
       select count(*)::bigint as total
       from public.v_best_offers v
+      join public.price_sources ps on ps.id = v.source_id
       ${where}
     `,
   );
@@ -736,11 +731,17 @@ if (includeTotal) {
 
 const r = await execBestOffers(
   sql`
-    select v.*
+    select
+      v.*,
+      ps.certification_tier as source_certification_tier,
+      coalesce(ps.quality_score, coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50))::numeric as source_quality_score,
+      coalesce(ps.catalog_publish_enabled, true) as source_publish_enabled,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50)::numeric as trust_score
     from public.v_best_offers_ui v
+    join public.price_sources ps on ps.id = v.source_id
     ${where}
     order by v.is_price_trusted desc, v.display_price_iqd asc nulls last, v.last_observed_at desc nulls last
-    limit ${limit}
+    limit ${prefetchLimit}
     offset ${offset}
   `,
   sql`
@@ -753,11 +754,16 @@ const r = await execBestOffers(
       null::numeric as low_price_safe,
       null::numeric as high_price_safe,
       v.product_image_url as product_image_url_safe,
-      v.observed_at as last_observed_at
+      v.observed_at as last_observed_at,
+      ps.certification_tier as source_certification_tier,
+      coalesce(ps.quality_score, coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50))::numeric as source_quality_score,
+      coalesce(ps.catalog_publish_enabled, true) as source_publish_enabled,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50)::numeric as trust_score
     from public.v_best_offers v
+    join public.price_sources ps on ps.id = v.source_id
     ${where}
     order by coalesce(v.final_price, v.discount_price, v.base_price) asc nulls last, v.observed_at desc nulls last
-    limit ${limit}
+    limit ${prefetchLimit}
     offset ${offset}
   `,
 );
@@ -793,6 +799,7 @@ const r = await execBestOffers(
     const condsGeneral: any[] = [];
     condsGeneral.push(sql`v.category = 'general'`);
     if (regionId) condsGeneral.push(sql`v.region_id = ${regionId}`);
+    if (!includeUnpublished) condsGeneral.push(sql`coalesce(ps.catalog_publish_enabled, true) = true`);
     if (q) {
       const like = `%${q}%`;
       condsGeneral.push(sql`(
@@ -820,8 +827,14 @@ const r = await execBestOffers(
 
 const r2 = await execBestOffers(
   sql`
-    select v.*
+    select
+      v.*,
+      ps.certification_tier as source_certification_tier,
+      coalesce(ps.quality_score, coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50))::numeric as source_quality_score,
+      coalesce(ps.catalog_publish_enabled, true) as source_publish_enabled,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50)::numeric as trust_score
     from public.v_best_offers_ui v
+    join public.price_sources ps on ps.id = v.source_id
     ${whereGeneral}
     order by v.is_price_trusted desc, v.display_price_iqd asc nulls last, v.last_observed_at desc nulls last
     limit ${extraFetch}
@@ -836,8 +849,13 @@ const r2 = await execBestOffers(
       null::numeric as low_price_safe,
       null::numeric as high_price_safe,
       v.product_image_url as product_image_url_safe,
-      v.observed_at as last_observed_at
+      v.observed_at as last_observed_at,
+      ps.certification_tier as source_certification_tier,
+      coalesce(ps.quality_score, coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50))::numeric as source_quality_score,
+      coalesce(ps.catalog_publish_enabled, true) as source_publish_enabled,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50)::numeric as trust_score
     from public.v_best_offers v
+    join public.price_sources ps on ps.id = v.source_id
     ${whereGeneral}
     order by coalesce(v.final_price, v.discount_price, v.base_price) asc nulls last, v.observed_at desc nulls last
     limit ${extraFetch}
@@ -930,23 +948,28 @@ type CategoryBadge = 'trusted' | 'medium' | 'weak';
       category_conflict: meta.conflict,
     };
   });
+  const rankedRows = rankOfferRows(rows as Record<string, unknown>[], { includeUnpublished, limit });
 
   c.header('X-Limit', String(limit));
   c.header('X-Offset', String(offset));
   if (includeTotal && totalCount != null) c.header('X-Total-Count', String(totalCount));
-  return c.json(rows);
+  return c.json(rankedRows);
 });
 
 
 viewRoutes.get('/product_offers', async (c) => {
   const productId = c.req.query('product_id');
   if (!productId) return c.json({ error: 'product_id required' }, 400);
+  const includeUnpublished = ['1', 'true', 'yes'].includes(String(c.req.query('include_unpublished') ?? '').toLowerCase());
   const db = getDb(c.env);
 
   const r = await db.execute(sql`
     select
       o.*,
       coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50)::numeric(3,2) as trust_score,
+      ps.certification_tier as source_certification_tier,
+      coalesce(ps.quality_score, coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50))::numeric as source_quality_score,
+      coalesce(ps.catalog_publish_enabled, true) as source_publish_enabled,
       coalesce(a.reports_total,0)::int as crowd_reports_total,
       coalesce(a.wrong_price,0)::int as crowd_wrong_price,
       coalesce(a.unavailable,0)::int as crowd_unavailable,
@@ -976,26 +999,33 @@ viewRoutes.get('/product_offers', async (c) => {
     left join public.v_offer_reports_agg a
       on a.offer_id = o.offer_id
     where o.product_id = ${productId}::uuid
+      and (${includeUnpublished} = true or coalesce(ps.catalog_publish_enabled, true) = true)
     order by final_price asc nulls last
   `);
 
-  return c.json(r.rows ?? []);
+  return c.json(rankOfferRows(((r.rows as Record<string, unknown>[]) ?? []), { includeUnpublished }));
 });
 
 viewRoutes.get('/compare_offers', async (c) => {
   const productId = c.req.query('product_id');
   const regionId = c.req.query('region_id');
   const limit = clampInt(c.req.query('limit'), 20, 1, 100);
+  const includeUnpublished = ['1', 'true', 'yes'].includes(String(c.req.query('include_unpublished') ?? '').toLowerCase());
   if (!productId) return c.json({ error: 'product_id required' }, 400);
 
   const db = getDb(c.env);
   const conds: any[] = [sql`o.product_id = ${productId}::uuid`];
   if (regionId) conds.push(sql`o.region_id = ${regionId}::uuid`);
+  if (!includeUnpublished) conds.push(sql`coalesce(ps.catalog_publish_enabled, true) = true`);
   const where = sql`where ${sql.join(conds, sql` and `)}`;
 
   const r = await db.execute(sql`
     select
       o.*,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50)::numeric(3,2) as trust_score,
+      ps.certification_tier as source_certification_tier,
+      coalesce(ps.quality_score, coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50))::numeric as source_quality_score,
+      coalesce(ps.catalog_publish_enabled, true) as source_publish_enabled,
       coalesce(a.reports_total,0)::int as crowd_reports_total,
       coalesce(a.wrong_price,0)::int as crowd_wrong_price,
       coalesce(a.unavailable,0)::int as crowd_unavailable,
@@ -1026,12 +1056,10 @@ viewRoutes.get('/compare_offers', async (c) => {
     .filter((x): x is number => x != null && Number.isFinite(x));
   const cheapest = validPrices.length ? Math.min(...validPrices) : null;
 
-  const ranked = rows
-    .map((row) => ({
-      ...row,
-      comparison: scoreOffer(row, cheapest),
-    }))
-    .sort((a, b) => (b.comparison.breakdown.total as number) - (a.comparison.breakdown.total as number));
+  const ranked = rankOfferRows(rows, { includeUnpublished, limit }).map((row) => ({
+    ...row,
+    comparison: row.comparison ?? rankOfferRow(row, { cheapestPrice: cheapest }),
+  }));
 
   return c.json({
     product_id: productId,
@@ -1046,26 +1074,36 @@ viewRoutes.get('/compare_products', async (c) => {
   const productAId = c.req.query('product_a_id') ?? c.req.query('left_product_id');
   const productBId = c.req.query('product_b_id') ?? c.req.query('right_product_id');
   const regionId = c.req.query('region_id');
+  const includeUnpublished = ['1', 'true', 'yes'].includes(String(c.req.query('include_unpublished') ?? '').toLowerCase());
   if (!productAId || !productBId) {
     return c.json({ error: 'product_a_id and product_b_id are required' }, 400);
   }
 
   const db = getDb(c.env);
-  const regionClause = regionId ? sql`and region_id = ${regionId}` : sql``;
+  const offersRegionClause = regionId ? sql`and v.region_id = ${regionId}` : sql``;
+  const countsRegionClause = regionId ? sql`and region_id = ${regionId}` : sql``;
+  const publishClause = includeUnpublished ? sql`` : sql`and coalesce(ps.catalog_publish_enabled, true) = true`;
 
   const offersResult = await db.execute(sql`
-    select *
-    from public.v_best_offers_ui
-    where (product_id = ${productAId} or product_id = ${productBId})
-    ${regionClause}
-    order by is_price_trusted desc, display_price_iqd asc nulls last, last_observed_at desc nulls last
+    select
+      v.*,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50)::numeric(3,2) as trust_score,
+      ps.certification_tier as source_certification_tier,
+      coalesce(ps.quality_score, coalesce(ps.trust_weight_dynamic, ps.trust_weight, 0.50))::numeric as source_quality_score,
+      coalesce(ps.catalog_publish_enabled, true) as source_publish_enabled
+    from public.v_best_offers_ui v
+    join public.price_sources ps on ps.id = v.source_id
+    where (v.product_id = ${productAId} or v.product_id = ${productBId})
+    ${offersRegionClause}
+    ${publishClause}
+    order by v.is_price_trusted desc, v.display_price_iqd asc nulls last, v.last_observed_at desc nulls last
   `);
 
   const countsResult = await db.execute(sql`
     select product_id, count(*)::int as offer_count
     from public.v_product_all_offers
     where (product_id = ${productAId} or product_id = ${productBId})
-    ${regionClause}
+    ${countsRegionClause}
     group by product_id
   `);
 
@@ -1074,17 +1112,19 @@ viewRoutes.get('/compare_products', async (c) => {
     offerCounts.set(String(row.product_id), Number(row.offer_count ?? 0));
   }
 
+  const rankedOfferRows = rankOfferRows(((offersResult.rows as Record<string, unknown>[]) ?? []), { includeUnpublished });
+
   const bestByProduct = new Map<string, Record<string, unknown>>();
-  for (const row of (offersResult.rows as Record<string, unknown>[]) ?? []) {
-    const key = String(row.product_id ?? '');
+  for (const row of rankedOfferRows) {
+    const key = String(row['product_id'] ?? '');
     if (!key || bestByProduct.has(key)) continue;
     bestByProduct.set(key, row);
   }
 
   const aRow = bestByProduct.get(String(productAId)) ?? null;
   const bRow = bestByProduct.get(String(productBId)) ?? null;
-  const aBase = scoreProduct(aRow, offerCounts.get(String(productAId)) ?? 0);
-  const bBase = scoreProduct(bRow, offerCounts.get(String(productBId)) ?? 0);
+  const aBase = scoreProductRow(aRow, offerCounts.get(String(productAId)) ?? 0);
+  const bBase = scoreProductRow(bRow, offerCounts.get(String(productBId)) ?? 0);
 
   const priceA = aRow ? pickPrice(aRow) : null;
   const priceB = bRow ? pickPrice(bRow) : null;

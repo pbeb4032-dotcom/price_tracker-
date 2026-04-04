@@ -18,6 +18,7 @@ import { patchCanonicalIdentitySchema } from './jobs/patchCanonicalIdentitySchem
 import { patchCatalogTaxonomyGovernanceSchema } from './jobs/patchCatalogTaxonomyGovernanceSchema';
 import { patchBarcodeResolutionSchema } from './jobs/patchBarcodeResolutionSchema';
 import { patchGovernedFxSchema } from './jobs/patchGovernedFxSchema';
+import { patchSourceCertificationSchema } from './jobs/patchSourceCertificationSchema';
 import { seedTaxonomyV2 } from './jobs/seedTaxonomyV2';
 import { validateCandidateSources } from './jobs/validateCandidateSources';
 import { activateCandidateSources } from './jobs/activateCandidateSources';
@@ -156,6 +157,16 @@ async function main() {
     logger.info('Governed FX schema patched successfully');
   } catch (e: any) {
     logger.warn('patchGovernedFxSchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
+  }
+
+  try {
+    await patchSourceCertificationSchema(env as any);
+    logger.info('Source certification schema patched successfully');
+  } catch (e: any) {
+    logger.warn('patchSourceCertificationSchema failed', {
       error: e?.message ?? e,
       stack: e?.stack,
     });

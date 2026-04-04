@@ -37,18 +37,6 @@ function normalizeOfferRow(row: RawOfferRow): BestOffer {
   } as BestOffer;
 }
 
-function sortOffers(rows: BestOffer[]): BestOffer[] {
-  return [...rows].sort((a: any, b: any) => {
-    const trustA = a?.is_price_trusted === true ? 1 : 0;
-    const trustB = b?.is_price_trusted === true ? 1 : 0;
-    if (trustA !== trustB) return trustB - trustA;
-
-    const priceA = Number(a?.display_price_iqd ?? a?.final_price ?? Number.MAX_SAFE_INTEGER);
-    const priceB = Number(b?.display_price_iqd ?? b?.final_price ?? Number.MAX_SAFE_INTEGER);
-    return priceA - priceB;
-  });
-}
-
 function dedupeOffers(rows: BestOffer[]): BestOffer[] {
   const seen = new Set<string>();
   const out: BestOffer[] = [];
@@ -140,7 +128,7 @@ export function useBestOffers({
         ? await fetchApiBestOffers({ category: cat, subcategory: sub, regionId, limit: safeLimit, offset: safeOffset })
         : await fetchSupabaseBestOffers({ category: cat, subcategory: sub, regionId, limit: safeLimit, offset: safeOffset });
 
-      return sortOffers(dedupeOffers(rows.map(normalizeOfferRow)));
+      return dedupeOffers(rows.map(normalizeOfferRow));
     },
     staleTime: 60_000,
   });

@@ -47,6 +47,14 @@ export interface BestOffer {
   is_price_suspected?: boolean | null;
   is_price_anomaly?: boolean | null;
   is_price_trusted?: boolean | null;
+  source_certification_tier?: string | null;
+  source_quality_score?: number | null;
+  source_publish_enabled?: boolean | null;
+  comparison?: {
+    breakdown?: Record<string, unknown> | null;
+    reasons?: string[] | null;
+    [key: string]: unknown;
+  } | null;
 
   // Optional category confidence fields (added by newer APIs)
   category_confidence?: number | null;
@@ -90,6 +98,14 @@ export interface ProductOffer {
   confidence_reasons?: string[] | null;
   is_price_suspected?: boolean | null;
   is_price_anomaly?: boolean | null;
+  source_certification_tier?: string | null;
+  source_quality_score?: number | null;
+  source_publish_enabled?: boolean | null;
+  comparison?: {
+    breakdown?: Record<string, unknown> | null;
+    reasons?: string[] | null;
+    [key: string]: unknown;
+  } | null;
 
   // Optional crowd signals
   crowd_reports_total?: number | null;

@@ -36,7 +36,18 @@ export async function activateCandidateSources(env: Env, opts?: ActivateOpts): P
           is_active=true,
           crawl_enabled=true,
           validated_at=coalesce(validated_at, now()),
-          activated_at=now()
+          activated_at=now(),
+          certification_tier='observed',
+          certification_status='pending',
+          catalog_publish_enabled=false,
+          certification_reason='activated_for_observation_not_publication',
+          certification_meta=jsonb_build_object(
+            'activated_from_candidate', true,
+            'activation_score', ${Number(r.validation_score ?? 0)}::numeric,
+            'activated_at', now()
+          ),
+          quality_score=greatest(coalesce(validation_score, 0), coalesce(trust_weight_dynamic, trust_weight, 0.50)),
+          quality_updated_at=now()
       where id=${String(r.id)}::uuid
     `);
     activatedDomains.push(String(r.domain));

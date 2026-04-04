@@ -43,6 +43,7 @@ import { patchCanonicalIdentitySchema } from '../jobs/patchCanonicalIdentitySche
 import { patchCatalogTaxonomyGovernanceSchema } from '../jobs/patchCatalogTaxonomyGovernanceSchema';
 import { patchBarcodeResolutionSchema } from '../jobs/patchBarcodeResolutionSchema';
 import { patchGovernedFxSchema } from '../jobs/patchGovernedFxSchema';
+import { patchSourceCertificationSchema } from '../jobs/patchSourceCertificationSchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
 import { backfillCanonicalIdentity } from '../jobs/backfillCanonicalIdentity';
@@ -55,6 +56,7 @@ import { getCoverageStats } from '../jobs/coverageStats';
 import { getAppSetting } from '../lib/appSettings';
 import { patchAdminHealthSchema } from '../jobs/patchAdminHealthSchema';
 import { getLatestFxPublications, rolloverLatestFxPublicationToLegacy } from '../fx/governedFx';
+import { certifySources, getRecentSourceCertificationRuns } from '../catalog/sourceCertification';
 
 type Ctx = { Bindings: Env; Variables: { auth: AppAuthContext | null } };
 
@@ -749,6 +751,13 @@ adminRoutes.get('/source_health', async (c) => {
       select id, domain, name_ar, is_active,
              trust_weight,
              lifecycle_status,
+             certification_tier,
+             certification_status,
+             catalog_publish_enabled,
+             quality_score,
+             quality_updated_at,
+             certification_reason,
+             certification_meta,
              crawl_enabled,
              validation_state,
              validation_score,
@@ -1110,6 +1119,13 @@ adminRoutes.post('/jobs/health_scan', async (c) => {
       select id, domain, name_ar, is_active,
              trust_weight,
              lifecycle_status,
+             certification_tier,
+             certification_status,
+             catalog_publish_enabled,
+             quality_score,
+             quality_updated_at,
+             certification_reason,
+             certification_meta,
              crawl_enabled,
              validation_state,
              validation_score,
@@ -1685,6 +1701,78 @@ adminRoutes.post('/jobs/rollup_source_health', async (c) => {
   const hours = Math.max(6, Math.min(168, Number((body as any).hours ?? 24)));
   const result = await rollupSourceHealth(c.env, { hours });
   return c.json(result);
+});
+
+adminRoutes.post('/jobs/patch_source_certification_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchSourceCertificationSchema(c.env);
+  return c.json(result);
+});
+
+adminRoutes.post('/jobs/certify_sources', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const body = await c.req.json().catch(() => ({}));
+  const hours = Math.max(24, Math.min(24 * 30, Number((body as any).hours ?? 72)));
+  const limit = Math.max(1, Math.min(5000, Number((body as any).limit ?? 500)));
+  const apply = Boolean((body as any).apply ?? true);
+  const result = await certifySources(c.env, { hours, limit, apply });
+  return c.json(result);
+});
+
+adminRoutes.get('/source_certification', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const limit = Math.max(1, Math.min(500, Number(c.req.query('limit') ?? 200)));
+  const rows = await gate.db.execute(sql`
+    select
+      ps.id,
+      ps.domain,
+      ps.name_ar,
+      ps.is_active,
+      ps.lifecycle_status,
+      ps.validation_state,
+      ps.validation_score,
+      ps.certification_tier,
+      ps.certification_status,
+      ps.catalog_publish_enabled,
+      ps.quality_score,
+      ps.quality_updated_at,
+      ps.certification_reason,
+      ps.certification_meta,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight) as trust_effective,
+      sh.successes,
+      sh.failures,
+      sh.error_rate,
+      sh.anomaly_rate,
+      sh.last_success_at,
+      sh.last_error_at
+    from public.price_sources ps
+    left join public.v_source_health_latest sh on sh.source_id = ps.id
+    where ps.country_code = 'IQ'
+    order by
+      case ps.certification_tier
+        when 'suspended' then 0
+        when 'sandbox' then 1
+        when 'observed' then 2
+        when 'published' then 3
+        when 'anchor' then 4
+        else 5
+      end asc,
+      coalesce(ps.quality_score, 0) asc,
+      ps.domain asc
+    limit ${limit}::int
+  `).catch(() => ({ rows: [] as any[] }));
+  return c.json({ ok: true, items: rows.rows ?? [] });
+});
+
+adminRoutes.get('/source_certification/runs', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const limit = Math.max(1, Math.min(100, Number(c.req.query('limit') ?? 20)));
+  const items = await getRecentSourceCertificationRuns(gate.db, limit);
+  return c.json({ ok: true, items });
 });
 
 // FX: update official + market rates for today (best-effort, non-blocking)

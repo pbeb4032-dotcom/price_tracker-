@@ -13,7 +13,7 @@ import { useProductImages } from '@/hooks/offers/useProductImages';
 import { ProductImageGallery } from '@/components/offers/ProductImageGallery';
 import { useSeoMeta } from '@/lib/seo/useSeoMeta';
 import { formatIQDPrice, discountPercent } from '@/lib/offers/normalization';
-import { getBestOfferReason, rankOffers } from '@/lib/offers/ranking';
+import { getBestOfferReason } from '@/lib/offers/ranking';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { useCompareOffers, type ApiOfferComparisonRow } from '@/hooks/offers/useApiComparisons';
@@ -35,8 +35,6 @@ const ProductOffers = () => {
   const { data: productImages } = useProductImages(productId);
   const serverOfferCompare = useCompareOffers(productId, regionId, Boolean(productId), 30);
 
-  const rankedLocal = offers ? rankOffers(offers) : [];
-
   const comparisonByOfferId = useMemo(() => {
     const map = new Map<string, ApiOfferComparisonRow>();
     for (const row of serverOfferCompare.data?.offers ?? []) {
@@ -46,14 +44,15 @@ const ProductOffers = () => {
   }, [serverOfferCompare.data?.offers]);
 
   const ranked = useMemo(() => {
-    if (!rankedLocal.length) return [];
+    const base = offers ?? [];
+    if (!base.length) return [];
     const serverOrder = (serverOfferCompare.data?.offers ?? [])
       .map((row) => row.offer_id)
       .filter((id): id is string => Boolean(id));
 
-    if (!serverOrder.length) return rankedLocal;
+    if (!serverOrder.length) return base;
 
-    const localById = new Map(rankedLocal.map((o) => [String(o.offer_id), o] as const));
+    const localById = new Map(base.map((o) => [String(o.offer_id), o] as const));
     const ordered: ProductOffer[] = [];
     const used = new Set<string>();
 
@@ -64,13 +63,13 @@ const ProductOffers = () => {
       used.add(String(match.offer_id));
     }
 
-    for (const item of rankedLocal) {
+    for (const item of base) {
       const id = String(item.offer_id);
       if (!used.has(id)) ordered.push(item);
     }
 
     return ordered;
-  }, [rankedLocal, serverOfferCompare.data?.offers]);
+  }, [offers, serverOfferCompare.data?.offers]);
 
   const best = ranked[0];
   const bestServerRow = best ? comparisonByOfferId.get(String(best.offer_id)) : undefined;
