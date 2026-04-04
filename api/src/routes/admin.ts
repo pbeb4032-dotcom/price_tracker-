@@ -48,6 +48,7 @@ import { patchBarcodeResolutionSchema } from '../jobs/patchBarcodeResolutionSche
 import { patchGovernedFxSchema } from '../jobs/patchGovernedFxSchema';
 import { patchSourceCertificationSchema } from '../jobs/patchSourceCertificationSchema';
 import { patchSourceOnboardingSchema } from '../jobs/patchSourceOnboardingSchema';
+import { patchSourceAdapterBacklogSchema } from '../jobs/patchSourceAdapterBacklogSchema';
 import { seedTaxonomyV2 } from '../jobs/seedTaxonomyV2';
 import { backfillTaxonomyV2 } from '../jobs/backfillTaxonomyV2';
 import { backfillCanonicalIdentity } from '../jobs/backfillCanonicalIdentity';
@@ -61,6 +62,7 @@ import { getAppSetting } from '../lib/appSettings';
 import { patchAdminHealthSchema } from '../jobs/patchAdminHealthSchema';
 import { getLatestFxPublications, rolloverLatestFxPublicationToLegacy } from '../fx/governedFx';
 import { certifySources, getRecentSourceCertificationRuns } from '../catalog/sourceCertification';
+import { applySourceAdapterBacklogAction } from '../catalog/sourceAdapterBacklog';
 import { getSourceAdapterReadiness } from '../catalog/sourceAdapterReadiness';
 import { getRecentSourceSeedImportRuns, importSourceSeeds } from '../catalog/sourceSeedImport';
 import { getListingConditionOverview, getListingConditionQuarantine } from '../catalog/listingConditionOps';
@@ -1880,6 +1882,13 @@ adminRoutes.post('/jobs/patch_source_onboarding_schema', async (c) => {
   return c.json(result);
 });
 
+adminRoutes.post('/jobs/patch_source_adapter_backlog_schema', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const result = await patchSourceAdapterBacklogSchema(c.env);
+  return c.json(result);
+});
+
 adminRoutes.post('/source_seed/import', async (c) => {
   const gate = await requireAdminOrInternal(c);
   if (!gate.ok || !gate.db) return gate.res!;
@@ -2647,6 +2656,48 @@ adminRoutes.get('/source_adapter_readiness', async (c) => {
 
   const result = await getSourceAdapterReadiness(gate.db, { domains, limit });
   return c.json({ ...result, pack: packId });
+});
+
+const sourceAdapterBacklogActionSchema = z.object({
+  source_id: z.string().uuid().optional(),
+  domain: z.string().trim().min(1).optional(),
+  action: z.enum([
+    'open_task',
+    'assign_api',
+    'assign_html',
+    'assign_mobile_adapter',
+    'assign_render',
+    'mark_in_progress',
+    'mark_completed',
+    'mark_postponed',
+    'reopen',
+  ]),
+  note: z.string().max(500).optional().nullable(),
+});
+
+adminRoutes.post('/source_adapter_backlog/action', async (c) => {
+  const gate = await requireAdminOrInternal(c);
+  if (!gate.ok || !gate.db) return gate.res!;
+  const parsed = sourceAdapterBacklogActionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ ok: false, error: 'invalid_payload', issues: parsed.error.flatten() }, 400);
+  }
+
+  try {
+    const result = await applySourceAdapterBacklogAction(gate.db, {
+      sourceId: parsed.data.source_id ?? null,
+      domain: parsed.data.domain ?? null,
+      action: parsed.data.action,
+      note: parsed.data.note ?? null,
+      actorType: gate.internal ? 'internal' : 'admin',
+      actorId: gate.auth?.appUserId ?? null,
+    });
+    return c.json(result);
+  } catch (error: any) {
+    const message = String(error?.message ?? error);
+    const status = message === 'source_not_found' || message === 'source_readiness_not_found' ? 404 : message === 'source_id_or_domain_required' || message === 'invalid_adapter_backlog_action' ? 400 : 500;
+    return c.json({ ok: false, error: message }, status);
+  }
 });
 
 

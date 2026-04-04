@@ -79,6 +79,14 @@ type SourceAdapterReadinessItem = {
   readiness_class: 'api_ready' | 'html_ready' | 'needs_mobile_adapter' | 'needs_render' | 'postpone';
   recommended_path: 'api' | 'html' | 'mobile_adapter' | 'render' | 'hold';
   readiness_reasons: string[];
+  backlog_id?: string | null;
+  backlog_status?: 'pending' | 'assigned' | 'in_progress' | 'completed' | 'postponed' | null;
+  backlog_assigned_path?: 'api' | 'html' | 'mobile_adapter' | 'render' | 'hold' | null;
+  backlog_priority?: number | null;
+  backlog_note?: string | null;
+  backlog_last_action?: string | null;
+  backlog_updated_at?: string | null;
+  backlog_action_count?: number | null;
 };
 type SourceAdapterReadinessResponse = {
   ok: boolean;
@@ -96,6 +104,11 @@ type SourceAdapterReadinessResponse = {
     with_bootstrap_paths?: number;
     js_only_sources?: number;
     render_paused_sources?: number;
+    backlog_pending?: number;
+    backlog_assigned?: number;
+    backlog_in_progress?: number;
+    backlog_completed?: number;
+    backlog_postponed?: number;
   };
   items?: SourceAdapterReadinessItem[];
 };
@@ -222,6 +235,22 @@ const ADAPTER_PATH_LABELS: Record<SourceAdapterReadinessItem['recommended_path']
   mobile_adapter: 'Mobile Adapter',
   render: 'Render',
   hold: 'Hold',
+};
+
+const ADAPTER_BACKLOG_STATUS_LABELS: Record<NonNullable<SourceAdapterReadinessItem['backlog_status']>, string> = {
+  pending: 'Pending',
+  assigned: 'Assigned',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  postponed: 'Postponed',
+};
+
+const ADAPTER_BACKLOG_STATUS_BADGES: Record<NonNullable<SourceAdapterReadinessItem['backlog_status']>, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+  pending: 'outline',
+  assigned: 'secondary',
+  in_progress: 'default',
+  completed: 'default',
+  postponed: 'destructive',
 };
 
 const ADAPTER_REASON_LABELS: Record<string, string> = {
@@ -589,6 +618,19 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Certification dry-run'),
+  });
+
+  const adapterBacklogAction = useMutation({
+    mutationFn: async (payload: { source_id: string; action: 'open_task' | 'assign_api' | 'assign_html' | 'assign_mobile_adapter' | 'assign_render' | 'mark_in_progress' | 'mark_completed' | 'mark_postponed' | 'reopen'; note?: string | null }) =>
+      apiPost('/admin/source_adapter_backlog/action', payload),
+    onSuccess: (r: any) => {
+      const status = r?.item?.status ? ` • ${r.item.status}` : '';
+      const path = r?.item?.assigned_path ? ` • ${r.item.assigned_path}` : '';
+      toast.success(`تم تحديث Adapter Backlog${status}${path}`);
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'فشل تحديث Adapter Backlog'),
   });
 
   // ── Auto-Discovery (Daily) + Coverage ──
@@ -1404,6 +1446,21 @@ const recomputeTrust = useMutation({
   const adapterReadinessItems = (scopedSourceAdapterReadiness.data?.items ?? []) as SourceAdapterReadinessItem[];
   const adapterReadinessSummary = scopedSourceAdapterReadiness.data?.summary ?? {};
   const taxonomyItems = (scopedTaxonomyQuarantine.data?.items ?? []) as TaxonomyQuarantineItem[];
+
+  const getRecommendedAdapterAction = (item: SourceAdapterReadinessItem) => {
+    switch (item.recommended_path) {
+      case 'api':
+        return { action: 'assign_api' as const, label: 'Assign API' };
+      case 'html':
+        return { action: 'assign_html' as const, label: 'Assign HTML' };
+      case 'mobile_adapter':
+        return { action: 'assign_mobile_adapter' as const, label: 'Assign Mobile' };
+      case 'render':
+        return { action: 'assign_render' as const, label: 'Assign Render' };
+      default:
+        return null;
+    }
+  };
 
   const packReviewVerdict = useMemo(() => {
     if (!hasPilotScope) {
@@ -2792,6 +2849,18 @@ const recomputeTrust = useMutation({
                           render paused: {Number(adapterReadinessSummary.render_paused_sources ?? 0).toLocaleString()}
                         </div>
 
+                        <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                          backlog pending: {Number(adapterReadinessSummary.backlog_pending ?? 0).toLocaleString()}
+                          {' • '}
+                          assigned: {Number(adapterReadinessSummary.backlog_assigned ?? 0).toLocaleString()}
+                          {' • '}
+                          in progress: {Number(adapterReadinessSummary.backlog_in_progress ?? 0).toLocaleString()}
+                          {' • '}
+                          completed: {Number(adapterReadinessSummary.backlog_completed ?? 0).toLocaleString()}
+                          {' • '}
+                          postponed: {Number(adapterReadinessSummary.backlog_postponed ?? 0).toLocaleString()}
+                        </div>
+
                         <div className="rounded-lg border">
                           <div className="border-b p-3 text-sm font-medium">Sources Worklist</div>
                           <div className="max-h-[420px] overflow-auto">
@@ -2802,6 +2871,17 @@ const recomputeTrust = useMutation({
                             ) : (
                               adapterReadinessItems.map((item) => (
                                 <div key={item.source_id} className="border-b p-3 text-sm last:border-b-0">
+                                  {(() => {
+                                    const recommendedAction = getRecommendedAdapterAction(item);
+                                    const backlogStatus = item.backlog_status ?? null;
+                                    const assignedPath = item.backlog_assigned_path ?? null;
+                                    const canStart = backlogStatus === 'pending' || backlogStatus === 'assigned';
+                                    const canComplete = backlogStatus === 'assigned' || backlogStatus === 'in_progress';
+                                    const canPostpone = backlogStatus !== 'completed' && backlogStatus !== 'postponed';
+                                    const canReopen = backlogStatus === 'completed' || backlogStatus === 'postponed';
+
+                                    return (
+                                      <>
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0">
                                       <div className="font-medium">{item.name_ar || item.domain}</div>
@@ -2814,6 +2894,16 @@ const recomputeTrust = useMutation({
                                       <Badge variant="outline">
                                         {ADAPTER_PATH_LABELS[item.recommended_path]}
                                       </Badge>
+                                      {backlogStatus ? (
+                                        <Badge variant={ADAPTER_BACKLOG_STATUS_BADGES[backlogStatus]}>
+                                          {ADAPTER_BACKLOG_STATUS_LABELS[backlogStatus]}
+                                        </Badge>
+                                      ) : null}
+                                      {assignedPath ? (
+                                        <Badge variant="outline">
+                                          task: {ADAPTER_PATH_LABELS[assignedPath]}
+                                        </Badge>
+                                      ) : null}
                                       {item.adapter_strategy ? <Badge variant="secondary">{item.adapter_strategy}</Badge> : null}
                                       {item.source_channel ? <Badge variant="secondary">{item.source_channel}</Badge> : null}
                                     </div>
@@ -2844,6 +2934,78 @@ const recomputeTrust = useMutation({
                                       js-only reason: {item.js_only_reason}
                                     </div>
                                   ) : null}
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {recommendedAction ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={adapterBacklogAction.isPending}
+                                        onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: recommendedAction.action })}
+                                      >
+                                        {recommendedAction.label}
+                                      </Button>
+                                    ) : null}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      disabled={adapterBacklogAction.isPending}
+                                      onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'open_task' })}
+                                    >
+                                      Open Task
+                                    </Button>
+                                    {canStart ? (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={adapterBacklogAction.isPending}
+                                        onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'mark_in_progress' })}
+                                      >
+                                        ابدأ
+                                      </Button>
+                                    ) : null}
+                                    {canComplete ? (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={adapterBacklogAction.isPending}
+                                        onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'mark_completed' })}
+                                      >
+                                        تم
+                                      </Button>
+                                    ) : null}
+                                    {canPostpone ? (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-red-600"
+                                        disabled={adapterBacklogAction.isPending}
+                                        onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'mark_postponed' })}
+                                      >
+                                        أجّله
+                                      </Button>
+                                    ) : null}
+                                    {canReopen ? (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={adapterBacklogAction.isPending}
+                                        onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'reopen' })}
+                                      >
+                                        أعد فتح
+                                      </Button>
+                                    ) : null}
+                                  </div>
+
+                                  {(item.backlog_action_count || item.backlog_note || item.backlog_last_action) ? (
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                      actions: {Number(item.backlog_action_count ?? 0)}
+                                      {item.backlog_last_action ? ` • last: ${item.backlog_last_action}` : ''}
+                                      {item.backlog_note ? ` • note: ${item.backlog_note}` : ''}
+                                    </div>
+                                  ) : null}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               ))
                             )}

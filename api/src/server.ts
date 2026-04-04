@@ -20,6 +20,7 @@ import { patchBarcodeResolutionSchema } from './jobs/patchBarcodeResolutionSchem
 import { patchGovernedFxSchema } from './jobs/patchGovernedFxSchema';
 import { patchSourceCertificationSchema } from './jobs/patchSourceCertificationSchema';
 import { patchSourceOnboardingSchema } from './jobs/patchSourceOnboardingSchema';
+import { patchSourceAdapterBacklogSchema } from './jobs/patchSourceAdapterBacklogSchema';
 import { seedTaxonomyV2 } from './jobs/seedTaxonomyV2';
 import { validateCandidateSources } from './jobs/validateCandidateSources';
 import { activateCandidateSources } from './jobs/activateCandidateSources';
@@ -178,6 +179,16 @@ async function main() {
     logger.info('Source onboarding schema patched successfully');
   } catch (e: any) {
     logger.warn('patchSourceOnboardingSchema failed', {
+      error: e?.message ?? e,
+      stack: e?.stack,
+    });
+  }
+
+  try {
+    await patchSourceAdapterBacklogSchema(env as any);
+    logger.info('Source adapter backlog schema patched successfully');
+  } catch (e: any) {
+    logger.warn('patchSourceAdapterBacklogSchema failed', {
       error: e?.message ?? e,
       stack: e?.stack,
     });
@@ -589,6 +600,10 @@ await db.execute(sql`
     await patchGovernedFxSchema(env as any);
   });
 
+  void safeRun('patch_source_adapter_backlog_schema', async () => {
+    await patchSourceAdapterBacklogSchema(env as any);
+  });
+
   void safeRun('seed_taxonomy_v2', async () => {
     await seedTaxonomyV2(env as any);
   });
@@ -710,6 +725,10 @@ await db.execute(sql`
 
   void safeRun('patch_governed_fx_schema', async () => {
     await patchGovernedFxSchema(env as any);
+  });
+
+  void safeRun('patch_source_adapter_backlog_schema', async () => {
+    await patchSourceAdapterBacklogSchema(env as any);
   });
 
   void safeRun('seed_taxonomy_v2', async () => {

@@ -211,6 +211,14 @@ type RawSourceAdapterReadinessRow = {
   anomaly_rate: number | null;
   last_success_at: string | null;
   last_error_at: string | null;
+  backlog_id: string | null;
+  backlog_status: string | null;
+  backlog_assigned_path: string | null;
+  backlog_priority: number | null;
+  backlog_note: string | null;
+  backlog_last_action: string | null;
+  backlog_updated_at: string | null;
+  backlog_action_count: number | null;
 };
 
 const READINESS_ORDER: Record<SourceAdapterReadinessClass, number> = {
@@ -253,9 +261,18 @@ export async function getSourceAdapterReadiness(db: any, opts: SourceAdapterRead
       sh.error_rate,
       sh.anomaly_rate,
       sh.last_success_at,
-      sh.last_error_at
+      sh.last_error_at,
+      bi.id as backlog_id,
+      bi.status as backlog_status,
+      bi.assigned_path as backlog_assigned_path,
+      bi.priority as backlog_priority,
+      bi.note as backlog_note,
+      bi.last_action as backlog_last_action,
+      bi.updated_at as backlog_updated_at,
+      coalesce(ba.backlog_action_count, 0)::int as backlog_action_count
     from public.price_sources ps
     left join public.v_source_health_latest sh on sh.source_id = ps.id
+    left join public.source_adapter_backlog_items bi on bi.source_id = ps.id
     left join lateral (
       select count(*) filter (where is_active = true) as active_entrypoints
       from public.source_entrypoints
@@ -276,6 +293,11 @@ export async function getSourceAdapterReadiness(db: any, opts: SourceAdapterRead
       from public.source_adapters
       where source_id = ps.id
     ) ad on true
+    left join lateral (
+      select count(*) as backlog_action_count
+      from public.source_adapter_backlog_actions
+      where source_id = ps.id
+    ) ba on true
     where ps.country_code = 'IQ'
       and (${requestedDomains.length} = 0 or ps.domain = any(${requestedDomains}::text[]))
     order by ps.domain asc
@@ -324,6 +346,11 @@ export async function getSourceAdapterReadiness(db: any, opts: SourceAdapterRead
       if (Number(item.active_bootstrap_paths ?? 0) > 0) acc.with_bootstrap_paths += 1;
       if (item.js_only) acc.js_only_sources += 1;
       if (item.render_paused_until && isFutureIso(item.render_paused_until)) acc.render_paused_sources += 1;
+      if (item.backlog_status === 'pending') acc.backlog_pending += 1;
+      if (item.backlog_status === 'assigned') acc.backlog_assigned += 1;
+      if (item.backlog_status === 'in_progress') acc.backlog_in_progress += 1;
+      if (item.backlog_status === 'completed') acc.backlog_completed += 1;
+      if (item.backlog_status === 'postponed') acc.backlog_postponed += 1;
       return acc;
     },
     {
@@ -338,6 +365,11 @@ export async function getSourceAdapterReadiness(db: any, opts: SourceAdapterRead
       with_bootstrap_paths: 0,
       js_only_sources: 0,
       render_paused_sources: 0,
+      backlog_pending: 0,
+      backlog_assigned: 0,
+      backlog_in_progress: 0,
+      backlog_completed: 0,
+      backlog_postponed: 0,
     },
   );
 
