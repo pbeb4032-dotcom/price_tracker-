@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeSourceAdapterBacklogTransition } from './sourceAdapterBacklog';
+import { computeSourceAdapterBacklogTransition, computeSourceAdapterExecutionScore } from './sourceAdapterBacklog';
 
 describe('sourceAdapterBacklog', () => {
   it('opens a pending task with the recommended path', () => {
@@ -43,5 +43,31 @@ describe('sourceAdapterBacklog', () => {
 
     expect(transition.status).toBe('pending');
     expect(transition.assignedPath).toBe('mobile_adapter');
+  });
+
+  it('prioritizes healthy API work over postponed hold work', () => {
+    const api = computeSourceAdapterExecutionScore({
+      queuePath: 'api',
+      backlogStatus: 'assigned',
+      sourcePriority: 60,
+      qualityScore: 0.82,
+      trustEffective: 0.8,
+      errorRate: 0.08,
+      successes: 40,
+      certificationTier: 'published',
+    });
+    const hold = computeSourceAdapterExecutionScore({
+      queuePath: 'hold',
+      backlogStatus: 'pending',
+      sourcePriority: 120,
+      qualityScore: 0.55,
+      trustEffective: 0.52,
+      errorRate: 0.3,
+      successes: 4,
+      certificationTier: 'sandbox',
+    });
+
+    expect(api.executionScore).toBeGreaterThan(hold.executionScore);
+    expect(api.impactScore).toBeGreaterThan(hold.impactScore);
   });
 });

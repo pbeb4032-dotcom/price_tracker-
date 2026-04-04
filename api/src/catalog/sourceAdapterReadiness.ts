@@ -19,6 +19,9 @@ export type SourceAdapterReadinessInput = {
   sourceChannel?: string | null;
   adapterStrategy?: string | null;
   certificationTier?: string | null;
+  sourcePriority?: number | null;
+  qualityScore?: number | null;
+  trustEffective?: number | null;
   autoDisabled?: boolean | null;
   jsOnly?: boolean | null;
   renderPausedUntil?: string | null;
@@ -191,11 +194,14 @@ type RawSourceAdapterReadinessRow = {
   source_channel: string | null;
   adapter_strategy: string | null;
   catalog_condition_policy: string | null;
+  source_priority: number | null;
   lifecycle_status: string | null;
   validation_state: string | null;
   certification_tier: string | null;
   certification_status: string | null;
   catalog_publish_enabled: boolean | null;
+  quality_score: number | null;
+  trust_effective: number | null;
   auto_disabled: boolean | null;
   render_paused_until: string | null;
   js_only: boolean | null;
@@ -242,11 +248,14 @@ export async function getSourceAdapterReadiness(db: any, opts: SourceAdapterRead
       ps.source_channel,
       ps.adapter_strategy,
       ps.catalog_condition_policy,
+      ps.source_priority,
       ps.lifecycle_status,
       ps.validation_state,
       ps.certification_tier,
       ps.certification_status,
       ps.catalog_publish_enabled,
+      ps.quality_score,
+      coalesce(ps.trust_weight_dynamic, ps.trust_weight) as trust_effective,
       coalesce(ps.auto_disabled, false) as auto_disabled,
       ps.render_paused_until,
       coalesce(ps.js_only, false) as js_only,
@@ -311,6 +320,9 @@ export async function getSourceAdapterReadiness(db: any, opts: SourceAdapterRead
         sourceChannel: row.source_channel,
         adapterStrategy: row.adapter_strategy,
         certificationTier: row.certification_tier,
+        sourcePriority: row.source_priority,
+        qualityScore: row.quality_score,
+        trustEffective: row.trust_effective,
         autoDisabled: row.auto_disabled,
         jsOnly: row.js_only,
         renderPausedUntil: row.render_paused_until,

@@ -112,6 +112,48 @@ type SourceAdapterReadinessResponse = {
   };
   items?: SourceAdapterReadinessItem[];
 };
+type SourceAdapterExecutionQueueItem = {
+  source_id: string;
+  domain: string;
+  name_ar?: string | null;
+  queue_path: 'api' | 'html' | 'mobile_adapter' | 'render' | 'hold';
+  backlog_status: 'pending' | 'assigned' | 'in_progress' | 'completed' | 'postponed';
+  execution_score: number;
+  impact_score: number;
+  health_score: number;
+  readiness_class: SourceAdapterReadinessItem['readiness_class'];
+  recommended_path?: SourceAdapterReadinessItem['recommended_path'] | null;
+  assigned_path?: SourceAdapterReadinessItem['backlog_assigned_path'] | null;
+  source_priority: number;
+  quality_score: number;
+  trust_effective: number;
+  error_rate: number;
+  successes: number;
+  failures: number;
+  certification_tier?: string | null;
+  readiness_reasons: string[];
+};
+type SourceAdapterExecutionQueueResponse = {
+  ok: boolean;
+  pack?: string | null;
+  requested_domains?: string[];
+  summary?: {
+    total_open?: number;
+    api?: number;
+    html?: number;
+    mobile_adapter?: number;
+    render?: number;
+    hold?: number;
+    pending?: number;
+    assigned?: number;
+    in_progress?: number;
+    completed?: number;
+    postponed?: number;
+    today_first_count?: number;
+  };
+  today_first?: SourceAdapterExecutionQueueItem[];
+  lanes?: Record<'api' | 'html' | 'mobile_adapter' | 'render' | 'hold', SourceAdapterExecutionQueueItem[]>;
+};
 type QuarantineItem = {
   id: string;
   status: 'pending' | 'approved' | 'rejected' | 'ignored' | string;
@@ -235,6 +277,14 @@ const ADAPTER_PATH_LABELS: Record<SourceAdapterReadinessItem['recommended_path']
   mobile_adapter: 'Mobile Adapter',
   render: 'Render',
   hold: 'Hold',
+};
+
+const ADAPTER_QUEUE_SECTION_LABELS: Record<SourceAdapterExecutionQueueItem['queue_path'], string> = {
+  api: 'API Queue',
+  html: 'HTML Queue',
+  mobile_adapter: 'Mobile Queue',
+  render: 'Render Queue',
+  hold: 'Hold Queue',
 };
 
 const ADAPTER_BACKLOG_STATUS_LABELS: Record<NonNullable<SourceAdapterReadinessItem['backlog_status']>, string> = {
@@ -374,6 +424,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل إضافة المصدر'),
   });
@@ -387,6 +438,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل التحديث'),
   });
@@ -559,6 +611,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل التحقق من المصادر'),
   });
@@ -573,6 +626,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-health'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل تفعيل المصادر'),
   });
@@ -586,6 +640,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-overview'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Seed pilot'),
   });
@@ -603,6 +658,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'listing-condition-quarantine'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-taxonomy-quarantine'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Ingest pilot'),
   });
@@ -616,6 +672,7 @@ export default function AdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'source-health', 24] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-certification'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل Certification dry-run'),
   });
@@ -628,6 +685,7 @@ export default function AdminPage() {
       const path = r?.item?.assigned_path ? ` • ${r.item.assigned_path}` : '';
       toast.success(`تم تحديث Adapter Backlog${status}${path}`);
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل تحديث Adapter Backlog'),
@@ -1425,6 +1483,13 @@ const recomputeTrust = useMutation({
     staleTime: 15_000,
   });
 
+  const scopedSourceAdapterExecutionQueue = useQuery({
+    queryKey: ['admin', 'scoped-source-adapter-execution-queue', pilotScopeQuery],
+    queryFn: async () => apiGet<SourceAdapterExecutionQueueResponse>(`/admin/source_adapter_execution_queue?limit=200${pilotScopeQuery ? `&${pilotScopeQuery}` : ''}`),
+    enabled: hasPilotScope,
+    staleTime: 15_000,
+  });
+
   const scopedTaxonomyQuarantine = useQuery({
     queryKey: ['admin', 'scoped-taxonomy-quarantine', taxV2Status, pilotScopeQuery],
     queryFn: async () => {
@@ -1445,6 +1510,10 @@ const recomputeTrust = useMutation({
   const healthItems = (scopedSourceHealth.data?.sources ?? []) as SourceHealthReviewItem[];
   const adapterReadinessItems = (scopedSourceAdapterReadiness.data?.items ?? []) as SourceAdapterReadinessItem[];
   const adapterReadinessSummary = scopedSourceAdapterReadiness.data?.summary ?? {};
+  const adapterExecutionQueue = scopedSourceAdapterExecutionQueue.data;
+  const adapterExecutionToday = (adapterExecutionQueue?.today_first ?? []) as SourceAdapterExecutionQueueItem[];
+  const adapterExecutionLanes = adapterExecutionQueue?.lanes ?? { api: [], html: [], mobile_adapter: [], render: [], hold: [] };
+  const adapterExecutionSummary = adapterExecutionQueue?.summary ?? {};
   const taxonomyItems = (scopedTaxonomyQuarantine.data?.items ?? []) as TaxonomyQuarantineItem[];
 
   const getRecommendedAdapterAction = (item: SourceAdapterReadinessItem) => {
@@ -1539,6 +1608,7 @@ const recomputeTrust = useMutation({
 	    qc.invalidateQueries({ queryKey: ['admin', 'site-plugins'] });
 	    qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
 	  },
 	  onError: (e: any) => {
 	    toast.error(e?.message || 'فشل تنصيب الحزمة');
@@ -1565,6 +1635,7 @@ const recomputeTrust = useMutation({
       qc.invalidateQueries({ queryKey: ['admin', 'site-plugins'] });
       qc.invalidateQueries({ queryKey: ['admin', 'price-sources'] });
       qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-readiness'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'scoped-source-adapter-execution-queue'] });
     },
     onError: (e: any) => toast.error(e?.message || 'فشل استيراد البلجن'),
   });
@@ -3010,6 +3081,183 @@ const recomputeTrust = useMutation({
                               ))
                             )}
                           </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Adapter Execution Queue</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!hasPilotScope ? (
+                      <div className="text-sm text-muted-foreground">
+                        Ø§Ø®ØªÙŽØ± pack Ø£Ùˆ domains Ø­ØªÙ‰ ØªØ·Ù„Ø¹ Ù„Ùƒ Ø·Ø§Ø¨ÙˆØ± ØªÙ†ÙÙŠØ° Ø­Ù‚ÙŠÙ‚ÙŠ: Ù…Ù†Ùˆ Ù†Ø¨Ø¯Ø£ Ø¨ÙŠÙ‡ Ø§Ù„ÙŠÙˆÙ…ØŒ ÙˆÙ…Ù†Ùˆ Ù†Ø¤Ø¬Ù„Ù‡ Ø±Ø³Ù…ÙŠÙ‹Ø§.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {selectedPilotPack ? <Badge variant="outline">{selectedPilotPack.name_ar}</Badge> : null}
+                          {normalizeScopeDomains(pilotScopeDomains).length ? (
+                            <Badge variant="outline">domains: {normalizeScopeDomains(pilotScopeDomains).length}</Badge>
+                          ) : null}
+                          <Badge variant="secondary">open work: {Number(adapterExecutionSummary.total_open ?? 0).toLocaleString()}</Badge>
+                          <Badge variant="secondary">today first: {Number(adapterExecutionSummary.today_first_count ?? 0).toLocaleString()}</Badge>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
+                          {[
+                            { label: 'Today First', value: adapterExecutionSummary.today_first_count },
+                            { label: 'API', value: adapterExecutionSummary.api },
+                            { label: 'HTML', value: adapterExecutionSummary.html },
+                            { label: 'Mobile', value: adapterExecutionSummary.mobile_adapter },
+                            { label: 'Render', value: adapterExecutionSummary.render },
+                            { label: 'Hold', value: adapterExecutionSummary.hold },
+                          ].map((item) => (
+                            <div key={item.label} className="rounded-lg border p-3">
+                              <div className="text-xs text-muted-foreground">{item.label}</div>
+                              <div className="mt-1 text-2xl font-bold">{Number(item.value ?? 0).toLocaleString()}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                          pending: {Number(adapterExecutionSummary.pending ?? 0).toLocaleString()}
+                          {' â€¢ '}
+                          assigned: {Number(adapterExecutionSummary.assigned ?? 0).toLocaleString()}
+                          {' â€¢ '}
+                          in progress: {Number(adapterExecutionSummary.in_progress ?? 0).toLocaleString()}
+                          {' â€¢ '}
+                          completed: {Number(adapterExecutionSummary.completed ?? 0).toLocaleString()}
+                          {' â€¢ '}
+                          postponed: {Number(adapterExecutionSummary.postponed ?? 0).toLocaleString()}
+                        </div>
+
+                        <div className="rounded-lg border">
+                          <div className="border-b p-3 text-sm font-medium">Today First</div>
+                          <div className="max-h-[360px] overflow-auto">
+                            {scopedSourceAdapterExecutionQueue.isLoading ? (
+                              <div className="p-3 text-sm text-muted-foreground">Ø¬Ø§Ø±Ù ØªØ­Ù…ÙŠÙ„ execution queueâ€¦</div>
+                            ) : adapterExecutionToday.length === 0 ? (
+                              <div className="p-3 text-sm text-muted-foreground">Ù…Ø§ÙƒÙˆ Ø£ÙˆÙ„ÙˆÙŠØ§Øª Ù…ÙØªÙˆØ­Ø© Ø¶Ù…Ù† Ø§Ù„Ù€ scope Ø§Ù„Ø­Ø§Ù„ÙŠ.</div>
+                            ) : (
+                              adapterExecutionToday.map((item) => {
+                                const canStart = item.backlog_status === 'pending' || item.backlog_status === 'assigned';
+                                const canComplete = item.backlog_status === 'assigned' || item.backlog_status === 'in_progress';
+                                const canPostpone = item.backlog_status !== 'completed' && item.backlog_status !== 'postponed';
+                                return (
+                                  <div key={`today-${item.source_id}`} className="border-b p-3 text-sm last:border-b-0">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="font-medium">{item.name_ar || item.domain}</div>
+                                        <div className="text-xs text-muted-foreground">{item.domain}</div>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <Badge variant="outline">{ADAPTER_QUEUE_SECTION_LABELS[item.queue_path]}</Badge>
+                                        <Badge variant={ADAPTER_BACKLOG_STATUS_BADGES[item.backlog_status]}>
+                                          {ADAPTER_BACKLOG_STATUS_LABELS[item.backlog_status]}
+                                        </Badge>
+                                        {item.assigned_path ? <Badge variant="secondary">{ADAPTER_PATH_LABELS[item.assigned_path]}</Badge> : null}
+                                        {item.certification_tier ? <Badge variant="secondary">{item.certification_tier}</Badge> : null}
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                      <span>execution: {Math.round(item.execution_score * 100)}%</span>
+                                      <span>impact: {Math.round(item.impact_score * 100)}%</span>
+                                      <span>health: {Math.round(item.health_score * 100)}%</span>
+                                      <span>priority: {item.source_priority}</span>
+                                      <span>quality: {Math.round(item.quality_score * 100)}%</span>
+                                      <span>trust: {Math.round(item.trust_effective * 100)}%</span>
+                                      <span>err: {Math.round(item.error_rate * 100)}%</span>
+                                      <span>ok: {Number(item.successes ?? 0)}</span>
+                                      <span>fail: {Number(item.failures ?? 0)}</span>
+                                    </div>
+
+                                    {item.readiness_reasons?.length ? (
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        {item.readiness_reasons.slice(0, 4).map((reason) => (
+                                          <Badge key={`queue-${item.source_id}-${reason}`} variant="outline" className="text-[11px]">
+                                            {ADAPTER_REASON_LABELS[reason] || reason}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    ) : null}
+
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {canStart ? (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          disabled={adapterBacklogAction.isPending}
+                                          onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'mark_in_progress' })}
+                                        >
+                                          Ø§Ø¨Ø¯Ø£
+                                        </Button>
+                                      ) : null}
+                                      {canComplete ? (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          disabled={adapterBacklogAction.isPending}
+                                          onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'mark_completed' })}
+                                        >
+                                          ØªÙ…
+                                        </Button>
+                                      ) : null}
+                                      {canPostpone ? (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="text-red-600"
+                                          disabled={adapterBacklogAction.isPending}
+                                          onClick={() => adapterBacklogAction.mutate({ source_id: item.source_id, action: 'mark_postponed' })}
+                                        >
+                                          Ø£Ø¬Ù‘Ù„Ù‡
+                                        </Button>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                          {(Object.keys(adapterExecutionLanes) as Array<keyof typeof adapterExecutionLanes>).map((lane) => {
+                            const laneItems = adapterExecutionLanes[lane] ?? [];
+                            return (
+                              <div key={lane} className="rounded-lg border">
+                                <div className="border-b p-3">
+                                  <div className="text-sm font-medium">{ADAPTER_QUEUE_SECTION_LABELS[lane]}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {Number(adapterExecutionSummary[lane] ?? laneItems.length).toLocaleString()} open
+                                  </div>
+                                </div>
+                                <div className="max-h-[260px] overflow-auto">
+                                  {laneItems.length === 0 ? (
+                                    <div className="p-3 text-xs text-muted-foreground">Ù…Ø§ÙƒÙˆ items Ø­Ø§Ù„ÙŠÙ‹Ø§.</div>
+                                  ) : (
+                                    laneItems.slice(0, 6).map((item) => (
+                                      <div key={`${lane}-${item.source_id}`} className="border-b p-3 text-xs last:border-b-0">
+                                        <div className="font-medium">{item.name_ar || item.domain}</div>
+                                        <div className="truncate text-muted-foreground">{item.domain}</div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                                          <Badge variant={ADAPTER_BACKLOG_STATUS_BADGES[item.backlog_status]}>
+                                            {ADAPTER_BACKLOG_STATUS_LABELS[item.backlog_status]}
+                                          </Badge>
+                                          <Badge variant="outline">{Math.round(item.execution_score * 100)}%</Badge>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </>
                     )}
