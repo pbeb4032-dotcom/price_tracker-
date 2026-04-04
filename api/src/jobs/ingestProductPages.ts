@@ -16,6 +16,7 @@ import {
   classifyGovernedTaxonomy,
   resolveMappedTaxonomyKey,
 } from '../catalog/taxonomyGovernance';
+import { assessListingCondition, loadSourceConditionContext } from '../catalog/listingCondition';
 import { getLatestFxRateForPricing } from '../fx/governedFx';
 import { computeRenderPriority } from '../lib/renderPriority';
 
@@ -357,6 +358,7 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
       from public.claim_crawl_frontier_batch(${limit}::int, '{}'::text[], ${perDomain}::int)
     `);
     const items = (claimed.rows as any[]) ?? [];
+    const sourceConditionCache = new Map<string, Awaited<ReturnType<typeof loadSourceConditionContext>>>();
 
     if (!items.length) {
       await finalizeRun(db, runId, processed, succeeded, failed, { notes: 'no_pending_items' });
@@ -679,6 +681,13 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         return;
       }
 
+      const sourceId = String(source.id);
+      let sourceConditionContext = sourceConditionCache.get(sourceId);
+      if (!sourceConditionContext) {
+        sourceConditionContext = await loadSourceConditionContext(db, sourceId);
+        sourceConditionCache.set(sourceId, sourceConditionContext);
+      }
+
       const adapters = await db.execute(sql`
         select adapter_type, selectors, priority
         from public.source_adapters
@@ -872,10 +881,22 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
       const priceConfidence = Math.min(1, priceConfidenceBase - (parsedCurrency !== 'IQD' ? 0.05 : 0));
 
       const legacyMatch = await resolveLegacyCatalogMatch(db, {
-        sourceId: String(source.id),
+        sourceId: sourceId,
         sourceDomain,
         sourceUrl: url,
         name: extracted.name ?? null,
+      });
+
+      const listingCondition = assessListingCondition({
+        source: sourceConditionContext.source,
+        sectionPolicies: sourceConditionContext.sectionPolicies,
+        sourceUrl: url,
+        canonicalUrl: extracted.canonicalUrl ?? null,
+        productName: extracted.name ?? null,
+        description: extracted.description ?? null,
+        siteCategory: siteCategoryRaw,
+        categoryHint: decidedCategory,
+        taxonomyHint: sug.taxonomyKey,
       });
 
       const gateDecision = assessPublicationGate({
@@ -884,6 +905,7 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         priceConfidence,
         categoryConflict: categoryConflictFinal,
         taxonomyConflict: Boolean(sug.conflict),
+        conditionDecision: listingCondition,
       });
 
       let gateRecord: { documentId: string; candidateId: string };
@@ -930,8 +952,12 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
           categoryHint: decidedCategory,
           subcategoryHint: decidedSubcategory,
           taxonomyHint: sug.taxonomyKey,
+          listingCondition: listingCondition.normalizedCondition,
+          conditionPolicy: listingCondition.sourcePolicy,
+          conditionReason: listingCondition.reason,
           categoryConflict: categoryConflictFinal,
           taxonomyConflict: Boolean(sug.conflict),
+          conditionDecision: listingCondition,
           match: legacyMatch,
           decision: gateDecision,
         });
@@ -963,6 +989,7 @@ export async function ingestProductPages(env: Env, opts?: { limit?: number; conc
         overrideSubcategoryId,
         existingProductId: legacyMatch.productId,
         allowCreate: false,
+        productCondition: listingCondition.normalizedCondition,
       });
       if (!productId) {
         await markPublicationOutcome(db, {
@@ -1278,6 +1305,7 @@ async function upsertProduct(
     overrideSubcategoryId?: string | null;
     existingProductId?: string | null;
     allowCreate?: boolean;
+    productCondition?: string | null;
   },
 ): Promise<string | null> {
   const det = (extracted as any)?.__catDet ?? inferCategoryKeyDetailed({
@@ -1312,6 +1340,7 @@ async function upsertProduct(
   const overrideSubcategoryId = decision?.overrideSubcategoryId ? String(decision.overrideSubcategoryId) : null;
   const forcedProductId = decision?.existingProductId ? String(decision.existingProductId) : null;
   const allowCreate = decision?.allowCreate !== false;
+  const productCondition = String(decision?.productCondition ?? 'new').trim() || 'new';
 
   const src = await db.execute(sql`
     select id from public.price_sources where domain = ${sourceDomain} limit 1
@@ -1353,6 +1382,7 @@ async function upsertProduct(
           end,
           category_manual = case when ${lockCategory} then true else coalesce(category_manual,false) end,
           category_override_id = case when ${lockCategory} then ${overrideCategoryId} else category_override_id end,
+          condition = ${productCondition},
           subcategory = case
             when ${nextSubcategory} is null then subcategory
             when ${lockSubcategory} then ${nextSubcategory}
@@ -1372,6 +1402,7 @@ async function upsertProduct(
         set
           description_ar = coalesce(description_ar, ${desc}),
           image_url = coalesce(image_url, ${img}),
+          condition = ${productCondition},
           category = case
             when category is null then case when ${allowUpgradeSafe} then ${nextCategory} else 'general' end
             when category = 'general' then case when ${allowUpgradeSafe} then ${nextCategory} else 'general' end
@@ -1426,20 +1457,20 @@ async function upsertProduct(
           name_ar, name_en, category, subcategory,
           category_manual, subcategory_manual,
           category_override_id, subcategory_override_id,
-          unit, description_ar, image_url, is_active
+          unit, description_ar, image_url, is_active, condition
         )
         values (
           ${name}, null, ${nextCategory}, ${nextSubcategory},
           ${lockCategory}, ${lockSubcategory},
           ${overrideCategoryId}, ${overrideSubcategoryId},
-          'pcs', ${desc}, ${img}, true
+          'pcs', ${desc}, ${img}, true, ${productCondition}
         )
         returning id
       `);
     } catch {
       created = await db.execute(sql`
-        insert into public.products (name_ar, name_en, category, unit, description_ar, image_url, is_active)
-        values (${name}, null, ${nextCategory}, 'pcs', ${desc}, ${img}, true)
+        insert into public.products (name_ar, name_en, category, unit, description_ar, image_url, is_active, condition)
+        values (${name}, null, ${nextCategory}, 'pcs', ${desc}, ${img}, true, ${productCondition})
         returning id
       `);
     }
@@ -1456,6 +1487,7 @@ async function upsertProduct(
         set
           description_ar = coalesce(description_ar, ${desc}),
           image_url = coalesce(image_url, ${img}),
+          condition = ${productCondition},
           category = case
             when ${lockCategory} then ${nextCategory}
             when coalesce(category_manual,false) = true then category
@@ -1482,6 +1514,7 @@ async function upsertProduct(
         set
           description_ar = coalesce(description_ar, ${desc}),
           image_url = coalesce(image_url, ${img}),
+          condition = ${productCondition},
           category = case when ${allowUpgrade} then ${nextCategory} else category end,
           updated_at = now()
         where id = ${productId}::uuid

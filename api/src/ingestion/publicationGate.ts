@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { resolveCanonicalVariant } from '../catalog/canonicalIdentity';
+import type { ListingConditionDecision, ListingCondition } from '../catalog/listingCondition';
 
 export type LegacyCatalogMatchKind =
   | 'url_map'
@@ -27,6 +28,7 @@ export type PublicationGateDecision = {
   identityConfidence: number;
   taxonomyConfidence: number;
   priceConfidence: number;
+  conditionConfidence: number;
   reasons: string[];
 };
 
@@ -233,10 +235,12 @@ export function assessPublicationGate(input: {
   priceConfidence?: number | null;
   categoryConflict?: boolean;
   taxonomyConflict?: boolean;
+  conditionDecision?: ListingConditionDecision | null;
 }): PublicationGateDecision {
   const identityConfidence = Number(input.match.confidence ?? 0);
   const taxonomyConfidence = Number(input.taxonomyConfidence ?? 0);
   const priceConfidence = Number(input.priceConfidence ?? 0);
+  const conditionConfidence = Number(input.conditionDecision?.confidence ?? 0);
 
   if (!ENABLE_PUBLICATION_GATE) {
     return {
@@ -246,6 +250,7 @@ export function assessPublicationGate(input: {
       identityConfidence,
       taxonomyConfidence,
       priceConfidence,
+      conditionConfidence,
       reasons: ['gate_disabled'],
     };
   }
@@ -258,6 +263,7 @@ export function assessPublicationGate(input: {
   if (input.taxonomyConflict) reasons.push('taxonomy_conflict');
   if (taxonomyConfidence < TAXONOMY_MIN_CONFIDENCE) reasons.push('taxonomy_confidence_low');
   if (priceConfidence < PRICE_MIN_CONFIDENCE) reasons.push('price_confidence_low');
+  if (input.conditionDecision && !input.conditionDecision.publishable) reasons.push(input.conditionDecision.reason || 'listing_condition_blocked');
 
   return {
     enabled: true,
@@ -266,6 +272,7 @@ export function assessPublicationGate(input: {
     identityConfidence,
     taxonomyConfidence,
     priceConfidence,
+    conditionConfidence,
     reasons,
   };
 }
@@ -291,8 +298,12 @@ export async function recordPublicationGateArtifacts(
     categoryHint?: string | null;
     subcategoryHint?: string | null;
     taxonomyHint?: string | null;
+    listingCondition?: ListingCondition | null;
+    conditionPolicy?: string | null;
+    conditionReason?: string | null;
     categoryConflict?: boolean;
     taxonomyConflict?: boolean;
+    conditionDecision?: ListingConditionDecision | null;
     match: LegacyCatalogMatch;
     decision: PublicationGateDecision;
   },
@@ -354,6 +365,11 @@ export async function recordPublicationGateArtifacts(
       category_hint,
       subcategory_hint,
       taxonomy_hint,
+      listing_condition,
+      condition_confidence,
+      condition_policy,
+      condition_reason,
+      matched_section_policy_id,
       match_kind,
       matched_product_id,
       matched_variant_id,
@@ -381,6 +397,11 @@ export async function recordPublicationGateArtifacts(
       ${input.categoryHint ?? null},
       ${input.subcategoryHint ?? null},
       ${input.taxonomyHint ?? null},
+      ${input.listingCondition ?? 'unknown'},
+      ${input.decision.conditionConfidence},
+      ${input.conditionPolicy ?? input.conditionDecision?.sourcePolicy ?? null},
+      ${input.conditionReason ?? input.conditionDecision?.reason ?? null},
+      ${input.conditionDecision?.matchedSectionPolicyId ?? null}::uuid,
       ${input.match.matchKind},
       ${input.match.productId}::uuid,
       ${input.match.variantId ?? null}::uuid,
@@ -428,9 +449,24 @@ export async function recordPublicationGateArtifacts(
       evidence: {},
     },
     {
+      type: 'condition',
+      status: input.conditionDecision?.publishable === false ? 'quarantined' : 'approved',
+      confidence: input.decision.conditionConfidence,
+      reason: input.conditionDecision?.reason ?? 'condition_ok',
+      evidence: input.conditionDecision?.evidence ?? {
+        listing_condition: input.listingCondition ?? null,
+        condition_policy: input.conditionPolicy ?? null,
+      },
+    },
+    {
       type: 'publication',
       status: input.decision.publishable ? 'approved' : 'quarantined',
-      confidence: Math.min(input.decision.identityConfidence, input.decision.taxonomyConfidence || 1, input.decision.priceConfidence || 1),
+      confidence: Math.min(
+        input.decision.identityConfidence,
+        input.decision.taxonomyConfidence || 1,
+        input.decision.priceConfidence || 1,
+        input.decision.conditionConfidence || 1,
+      ),
       reason: input.decision.reasons[0] ?? (input.decision.publishable ? 'publication_approved' : 'publication_quarantined'),
       evidence: { reasons: input.decision.reasons, gate_version: GATE_VERSION },
     },

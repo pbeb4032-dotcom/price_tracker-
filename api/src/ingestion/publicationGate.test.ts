@@ -94,4 +94,34 @@ describe('publication gate', () => {
     expect(result.publishable).toBe(false);
     expect(result.reasons).toContain('legacy_projection_missing');
   });
+
+  it('quarantines listings blocked by condition governance', () => {
+    const result = assessPublicationGate({
+      match: {
+        sourceId: 'source-1',
+        productId: 'product-1',
+        matchKind: 'url_map',
+        confidence: 0.99,
+      },
+      taxonomyConfidence: 0.96,
+      priceConfidence: 0.88,
+      categoryConflict: false,
+      taxonomyConflict: false,
+      conditionDecision: {
+        normalizedCondition: 'used',
+        publishable: false,
+        confidence: 0.99,
+        reason: 'listing_condition_used',
+        reasons: ['listing_condition_used'],
+        sourcePolicy: 'new_only',
+        matchedSectionPolicyId: null,
+        matchedSectionPolicyKey: null,
+        matchedSectionPolicyScope: null,
+        evidence: {},
+      },
+    });
+
+    expect(result.publishable).toBe(false);
+    expect(result.reasons).toContain('listing_condition_used');
+  });
 });

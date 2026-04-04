@@ -57,6 +57,12 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
       category_hint text,
       subcategory_hint text,
       taxonomy_hint text,
+      listing_condition text not null default 'unknown'
+        check (listing_condition in ('new', 'used', 'refurbished', 'open_box', 'unknown')),
+      condition_confidence numeric(4,3) not null default 0,
+      condition_policy text,
+      condition_reason text,
+      matched_section_policy_id uuid,
       match_kind text not null default 'none'
         check (match_kind in ('url_map', 'identifier', 'canonical_identifier', 'canonical_fingerprint', 'legacy_product', 'exact_name', 'none')),
       matched_product_id uuid null references public.products(id) on delete set null,
@@ -80,6 +86,17 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
   `);
   await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists matched_variant_id uuid null references public.catalog_product_variants(id) on delete set null`).catch(() => {});
   await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists matched_family_id uuid null references public.catalog_product_families(id) on delete set null`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists listing_condition text not null default 'unknown'`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists condition_confidence numeric(4,3) not null default 0`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists condition_policy text`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists condition_reason text`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates add column if not exists matched_section_policy_id uuid`).catch(() => {});
+  await db.execute(sql`alter table public.ingest_listing_candidates drop constraint if exists ingest_listing_candidates_listing_condition_check`).catch(() => {});
+  await db.execute(sql`
+    alter table public.ingest_listing_candidates
+    add constraint ingest_listing_candidates_listing_condition_check
+    check (listing_condition in ('new', 'used', 'refurbished', 'open_box', 'unknown'))
+  `).catch(() => {});
   await db.execute(sql`alter table public.ingest_listing_candidates drop constraint if exists ingest_listing_candidates_match_kind_check`).catch(() => {});
   await db.execute(sql`
     alter table public.ingest_listing_candidates
@@ -96,7 +113,7 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
       id uuid primary key default gen_random_uuid(),
       candidate_id uuid not null references public.ingest_listing_candidates(id) on delete cascade,
       decision_type text not null
-        check (decision_type in ('identity', 'taxonomy', 'price', 'publication')),
+        check (decision_type in ('identity', 'taxonomy', 'price', 'condition', 'publication')),
       decision_status text not null
         check (decision_status in ('approved', 'quarantined', 'rejected', 'pending', 'manual_review')),
       confidence numeric(4,3),
@@ -106,6 +123,12 @@ export async function patchPublicationGateSchema(env: Env): Promise<any> {
       created_at timestamptz not null default now()
     )
   `);
+  await db.execute(sql`alter table public.ingest_decisions drop constraint if exists ingest_decisions_decision_type_check`).catch(() => {});
+  await db.execute(sql`
+    alter table public.ingest_decisions
+    add constraint ingest_decisions_decision_type_check
+      check (decision_type in ('identity', 'taxonomy', 'price', 'condition', 'publication'))
+  `).catch(() => {});
   await db.execute(sql`create index if not exists idx_ingest_decisions_candidate on public.ingest_decisions(candidate_id, created_at desc)`).catch(() => {});
   await db.execute(sql`create index if not exists idx_ingest_decisions_type_status on public.ingest_decisions(decision_type, decision_status, created_at desc)`).catch(() => {});
 

@@ -10,6 +10,7 @@ import {
   recordPublicationGateArtifacts,
   resolveLegacyCatalogMatch,
 } from '../ingestion/publicationGate';
+import { assessListingCondition, loadSourceConditionContext, type SourceConditionContext } from '../catalog/listingCondition';
 import { classifyGovernedTaxonomy } from '../catalog/taxonomyGovernance';
 import { getLatestFxRateForPricing } from '../fx/governedFx';
 
@@ -42,7 +43,11 @@ export async function discoverProductApis(env: Env, opts?: { domain?: string; in
   const fxRate = await getLatestFxRateForPricing(db, DEFAULT_FALLBACK_FX);
 
   const src = await db.execute(sql`
-    select id, domain, name_ar, coalesce(trust_weight_dynamic, trust_weight) as trust_weight
+    select
+      id,
+      domain,
+      name_ar,
+      coalesce(trust_weight_dynamic, trust_weight) as trust_weight
     from public.price_sources
     where is_active=true and country_code='IQ' and coalesce(auto_disabled,false)=false
     ${opts?.domain ? sql`and domain = ${opts.domain}` : sql``}
@@ -55,6 +60,7 @@ export async function discoverProductApis(env: Env, opts?: { domain?: string; in
 
   for (const s of sources) {
     const domain = String(s.domain);
+    const sourceConditionContext = await loadSourceConditionContext(db, String(s.id));
     results[domain] = { endpoints: [], discovered: 0, inserted: 0, errors: [] as string[] };
 
     const endpoints = await detectEndpoints(domain);
@@ -88,6 +94,7 @@ export async function discoverProductApis(env: Env, opts?: { domain?: string; in
           trustWeight: Number(s.trust_weight ?? 0.5),
           regionId,
           fxRate,
+          sourceConditionContext,
           endpoint: ep,
           maxPages,
         });
@@ -145,6 +152,7 @@ async function ingestEndpoint(
     trustWeight: number;
     regionId: string;
     fxRate: number;
+    sourceConditionContext: SourceConditionContext;
     endpoint: { url: string; endpoint_type: EndpointType };
     maxPages: number;
   },
@@ -177,7 +185,7 @@ async function ingestEndpoint(
 async function upsertApiProduct(
   db: any,
   p: ExtractedApiProduct,
-  args: { domain: string; sourceId: string; merchantName: string; trustWeight: number; regionId: string; fxRate: number },
+  args: { domain: string; sourceId: string; merchantName: string; trustWeight: number; regionId: string; fxRate: number; sourceConditionContext: SourceConditionContext },
 ): Promise<boolean> {
   // Preserve the legacy category hint for compatibility with downstream price logic,
   // but let governed taxonomy decide the publishable taxonomy/category truth.
@@ -234,12 +242,24 @@ async function upsertApiProduct(
     name: p.name,
   });
 
+  const listingCondition = assessListingCondition({
+    source: args.sourceConditionContext.source,
+    sectionPolicies: args.sourceConditionContext.sectionPolicies,
+    sourceUrl: p.sourceUrl,
+    canonicalUrl: p.sourceUrl,
+    productName: p.name,
+    description: p.description ?? null,
+    categoryHint: governed.category,
+    taxonomyHint: taxonomySuggestion.taxonomyKey,
+  });
+
   const gateDecision = assessPublicationGate({
     match: legacyMatch,
     taxonomyConfidence: taxonomySuggestion.confidence,
     priceConfidence,
     categoryConflict: false,
     taxonomyConflict: Boolean(taxonomySuggestion.conflict),
+    conditionDecision: listingCondition,
   });
 
   let gateRecord: { documentId: string; candidateId: string };
@@ -272,8 +292,12 @@ async function upsertApiProduct(
       categoryHint: governed.category,
       subcategoryHint: governed.subcategory,
       taxonomyHint: taxonomySuggestion.taxonomyKey,
+      listingCondition: listingCondition.normalizedCondition,
+      conditionPolicy: listingCondition.sourcePolicy,
+      conditionReason: listingCondition.reason,
       categoryConflict: governed.conflict,
       taxonomyConflict: Boolean(taxonomySuggestion.conflict),
+      conditionDecision: listingCondition,
       match: legacyMatch,
       decision: gateDecision,
     });
@@ -289,6 +313,7 @@ async function upsertApiProduct(
   const productId = await upsertProduct(db, args.sourceId, args.domain, p.sourceUrl, p, {
     existingProductId: legacyMatch.productId,
     allowCreate: false,
+    productCondition: listingCondition.normalizedCondition,
   });
 
   if (!productId) {
@@ -456,7 +481,7 @@ async function upsertProduct(
   sourceDomain: string,
   url: string,
   p: ExtractedApiProduct,
-  opts?: { existingProductId?: string | null; allowCreate?: boolean },
+  opts?: { existingProductId?: string | null; allowCreate?: boolean; productCondition?: string | null },
 ): Promise<string | null> {
   const forcedProductId = opts?.existingProductId ? String(opts.existingProductId) : null;
   const inferredCategory = inferCategoryKey({
@@ -476,6 +501,7 @@ async function upsertProduct(
       `).catch(() => ({ rows: [] as any[] }));
 
   const mappedId = (mapped.rows as any[])[0]?.product_id as string | undefined;
+  const productCondition = String(opts?.productCondition ?? 'new').trim() || 'new';
   if (mappedId) {
     if (forcedProductId) {
       await db.execute(sql`
@@ -488,6 +514,11 @@ async function upsertProduct(
           updated_at = now()
       `).catch(() => {});
     }
+    await db.execute(sql`
+      update public.products
+      set condition = ${productCondition}, updated_at = now()
+      where id = ${mappedId}::uuid
+    `).catch(() => {});
     return mappedId;
   }
 
@@ -502,14 +533,20 @@ async function upsertProduct(
   if (!productId) {
     if (opts?.allowCreate === false) return null;
     const created = await db.execute(sql`
-      insert into public.products (name_ar, category, unit, description_ar, image_url, is_active)
-      values (${p.name}, ${inferredCategory}, 'pcs', ${p.description ?? null}, ${p.image ?? null}, true)
+      insert into public.products (name_ar, category, unit, description_ar, image_url, is_active, condition)
+      values (${p.name}, ${inferredCategory}, 'pcs', ${p.description ?? null}, ${p.image ?? null}, true, ${productCondition})
       returning id
     `);
     productId = (created.rows as any[])[0]?.id as string | undefined;
   }
 
   if (!productId) return null;
+
+  await db.execute(sql`
+    update public.products
+    set condition = ${productCondition}, updated_at = now()
+    where id = ${productId}::uuid
+  `).catch(() => {});
 
   await db.execute(sql`
     insert into public.product_url_map (source_id, url, canonical_url, product_id, status, last_seen_at)
